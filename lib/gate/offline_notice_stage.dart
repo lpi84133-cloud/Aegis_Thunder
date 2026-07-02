@@ -87,14 +87,15 @@ class _PortraitLayout extends StatelessWidget {
           ),
         ),
       ),
-      // Align guarantees perfect horizontal centering.
-      // FractionallySizedBox(0.72) matches sign width in this asset.
+      // Left edge matched at 0.72 widthFactor, but the sign center is
+      // slightly right of screen center. Shift x=+0.06 and widen to 0.78
+      // so both edges align with the sign.
       Align(
-        alignment: const Alignment(0, 0.94),
+        alignment: const Alignment(0.06, 0.94),
         child: SafeArea(
           top: false,
           child: FractionallySizedBox(
-            widthFactor: 0.72,
+            widthFactor: 0.78,
             child: _RetryButton(busy: busy, onTap: onRetry),
           ),
         ),
