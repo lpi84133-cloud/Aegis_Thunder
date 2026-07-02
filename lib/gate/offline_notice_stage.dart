@@ -10,33 +10,20 @@ class OfflineNoticeStage extends StatefulWidget {
   State<OfflineNoticeStage> createState() => _OfflineNoticeStageState();
 }
 
-class _OfflineNoticeStageState extends State<OfflineNoticeStage>
-    with SingleTickerProviderStateMixin {
+class _OfflineNoticeStageState extends State<OfflineNoticeStage> {
   bool _busy = false;
-  late final AnimationController _flicker;
 
   @override
   void initState() {
     super.initState();
-    // Explicitly unlock both orientations so the landscape asset shows
-    // when the user rotates the device.
+    // Ensure both orientations are allowed so the landscape asset
+    // activates when the user rotates the device.
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
-
-    _flicker = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2200),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _flicker.dispose();
-    super.dispose();
   }
 
   Future<void> _retry() async {
@@ -59,68 +46,53 @@ class _OfflineNoticeStageState extends State<OfflineNoticeStage>
             ? 'assets/Horizontal_Nowifi_Screen.webp'
             : 'assets/Vertical_Nowifi_Screen.webp';
 
-        final hPad = horiz ? 120.0 : 36.0;
-        final vPad = horiz ? 18.0 : 44.0;
-        final btnW = horiz ? 280.0 : double.infinity;
+        // How much space to reserve at the bottom for the button.
+        final buttonZone = horiz ? 80.0 : 110.0;
+        final hPad = horiz ? 140.0 : 48.0;
+        final vPad = horiz ? 12.0 : 28.0;
 
         return Stack(fit: StackFit.expand, children: [
-          Image.asset(art, fit: BoxFit.cover, gaplessPlayback: true),
-          Positioned.fill(
-            child: DecoratedBox(
+          // Image fills the screen minus the bottom button zone —
+          // this shifts the sign "up" so the button never overlaps it.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: buttonZone,
+            child: Image.asset(art, fit: BoxFit.cover, gaplessPlayback: true),
+          ),
+
+          // Dark area below the image where the button lives.
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: buttonZone + 20,
+            child: const DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  begin: Alignment.center,
+                  begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.55),
-                  ],
+                  colors: [Color(0x00000000), Color(0xCC000000)],
                 ),
               ),
             ),
           ),
 
+          // Centered button at the bottom.
           Positioned(
             left: hPad,
             right: hPad,
             bottom: vPad,
             child: SafeArea(
               top: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _flickeringTitle(horiz),
-                  SizedBox(height: horiz ? 14 : 20),
-                  SizedBox(
-                    width: btnW,
-                    child: _RetryButton(busy: _busy, onTap: _retry),
-                  ),
-                ],
+              child: Center(
+                child: _RetryButton(busy: _busy, onTap: _retry),
               ),
             ),
           ),
         ]);
       }),
-    );
-  }
-
-  Widget _flickeringTitle(bool horiz) {
-    return AnimatedBuilder(
-      animation: _flicker,
-      builder: (_, __) => Opacity(
-        opacity: 0.7 + 0.3 * _flicker.value,
-        child: Text(
-          'Storm has cut the wires',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: const Color(0xFFFFE58A),
-            fontSize: horiz ? 18 : 21,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 2,
-            shadows: const [Shadow(color: Colors.black, blurRadius: 8)],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -154,9 +126,7 @@ class _RetryButtonState extends State<_RetryButton> {
         child: Container(
           height: 50,
           decoration: BoxDecoration(
-            color: widget.busy
-                ? const Color(0xFF3A2A0A)
-                : gold,
+            color: widget.busy ? const Color(0xFF3A2A0A) : gold,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: widget.busy
