@@ -2,7 +2,7 @@ name: aegis_thunder
 description: "Aegis Thunder — deflect the storm."
 publish_to: 'none'
 
-version: 1.0.2+2
+version: 1.0.1+2
 
 environment:
   sdk: ^3.12.2
