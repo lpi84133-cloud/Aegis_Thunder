@@ -136,11 +136,12 @@ class _LandscapeLayout extends StatelessWidget {
           ),
         ),
       ),
-      // Align(0, …) = horizontally centred. widthFactor matches sign width.
+      // Sign in the landscape asset is slightly right of screen centre
+      // and narrower than 0.38. Shift x+0.03 and shrink to 0.34.
       Align(
-        alignment: const Alignment(0, 0.94),
+        alignment: const Alignment(0.03, 0.94),
         child: FractionallySizedBox(
-          widthFactor: 0.38,
+          widthFactor: 0.34,
           child: _RetryButton(busy: busy, onTap: onRetry),
         ),
       ),
