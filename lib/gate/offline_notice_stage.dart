@@ -87,16 +87,19 @@ class _PortraitLayout extends StatelessWidget {
           ),
         ),
       ),
-      // Left edge matched at 0.72 widthFactor, but the sign center is
-      // slightly right of screen center. Shift x=+0.06 and widen to 0.78
-      // so both edges align with the sign.
-      Align(
-        alignment: const Alignment(0.06, 0.94),
+      // Full SafeArea (top + bottom + sides) so the button never
+      // hides behind notch, status bar, or gesture nav on any device.
+      Positioned.fill(
         child: SafeArea(
-          top: false,
-          child: FractionallySizedBox(
-            widthFactor: 0.78,
-            child: _RetryButton(busy: busy, onTap: onRetry),
+          child: Align(
+            alignment: const Alignment(0.06, 1.0),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 24),
+              child: FractionallySizedBox(
+                widthFactor: 0.78,
+                child: _RetryButton(busy: busy, onTap: onRetry),
+              ),
+            ),
           ),
         ),
       ),
@@ -136,13 +139,20 @@ class _LandscapeLayout extends StatelessWidget {
           ),
         ),
       ),
-      // Sign in the landscape asset is slightly right of screen centre
-      // and narrower than 0.38. Shift x+0.03 and shrink to 0.34.
-      Align(
-        alignment: const Alignment(0.03, 0.94),
-        child: FractionallySizedBox(
-          widthFactor: 0.34,
-          child: _RetryButton(busy: busy, onTap: onRetry),
+      // Full SafeArea — in landscape the camera cutout is often on
+      // the left edge; SafeArea.left ensures buttons stay visible.
+      Positioned.fill(
+        child: SafeArea(
+          child: Align(
+            alignment: const Alignment(0.03, 1.0),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: FractionallySizedBox(
+                widthFactor: 0.34,
+                child: _RetryButton(busy: busy, onTap: onRetry),
+              ),
+            ),
+          ),
         ),
       ),
     ]);

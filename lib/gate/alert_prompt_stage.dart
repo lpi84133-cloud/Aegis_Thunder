@@ -81,6 +81,7 @@ class _AlertPromptStageState extends State<AlertPromptStage> {
         final vPad = horiz ? 14.0 : 36.0;
 
         return Stack(fit: StackFit.expand, children: [
+          // Image is full-bleed — covers notch/nav areas intentionally.
           Image.asset(art, fit: BoxFit.cover, gaplessPlayback: true),
           Positioned.fill(
             child: DecoratedBox(
@@ -97,59 +98,67 @@ class _AlertPromptStageState extends State<AlertPromptStage> {
             ),
           ),
 
-          // ── Buttons ─────────────────────────────────────
-          Positioned(
-            left: horiz ? hPad : hPad - portraitShift,
-            right: horiz ? hPad : hPad + portraitShift,
-            bottom: vPad,
+          // ── Buttons inside full SafeArea ─────────────────
+          // SafeArea handles notch (top), nav bar (bottom), and
+          // camera cutout (left/right in landscape) on every device.
+          Positioned.fill(
             child: SafeArea(
-              top: false,
-              child: horiz
-                  ? Row(
-                      children: [
-                        Expanded(
-                          child: _PromoButton(
-                            label: 'ACCEPT',
-                            solid: true,
-                            disabled: _busy,
-                            onTap: _accept,
-                          ),
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    left: horiz ? hPad : hPad - portraitShift,
+                    right: horiz ? hPad : hPad + portraitShift,
+                    bottom: vPad,
+                  ),
+                  child: horiz
+                      ? Row(
+                          children: [
+                            Expanded(
+                              child: _PromoButton(
+                                label: 'ACCEPT',
+                                solid: true,
+                                disabled: _busy,
+                                onTap: _accept,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: _PromoButton(
+                                label: 'SKIP',
+                                solid: false,
+                                disabled: _busy,
+                                onTap: _skip,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: btnWidth,
+                              child: _PromoButton(
+                                label: 'ACCEPT',
+                                solid: true,
+                                disabled: _busy,
+                                onTap: _accept,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: btnWidth,
+                              child: _PromoButton(
+                                label: 'SKIP',
+                                solid: false,
+                                disabled: _busy,
+                                onTap: _skip,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: _PromoButton(
-                            label: 'SKIP',
-                            solid: false,
-                            disabled: _busy,
-                            onTap: _skip,
-                          ),
-                        ),
-                      ],
-                    )
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: btnWidth,
-                          child: _PromoButton(
-                            label: 'ACCEPT',
-                            solid: true,
-                            disabled: _busy,
-                            onTap: _accept,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: btnWidth,
-                          child: _PromoButton(
-                            label: 'SKIP',
-                            solid: false,
-                            disabled: _busy,
-                            onTap: _skip,
-                          ),
-                        ),
-                      ],
-                    ),
+                ),
+              ),
             ),
           ),
         ]);
