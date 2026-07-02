@@ -55,8 +55,10 @@ class _OfflineNoticeStageState extends State<OfflineNoticeStage> {
 }
 
 // ─── Portrait ────────────────────────────────────────────────────────────────
-// Full-screen vertical image. Button sits at the very bottom, overlaying
-// the golden coins at the base — the sign is never obscured.
+// Vertical asset: 769×1377. With BoxFit.cover on a typical portrait screen
+// (~392×852) the image is scaled by height (0.619×). The sign in the
+// image occupies ≈70 % of image width → ~72 % of the visible screen width.
+// We match the button to that fraction for a flush fit.
 
 class _PortraitLayout extends StatelessWidget {
   final bool busy;
@@ -72,7 +74,6 @@ class _PortraitLayout extends StatelessWidget {
         fit: BoxFit.cover,
         gaplessPlayback: true,
       ),
-      // Gradient only at the very bottom so the button text stays readable.
       Positioned(
         left: 0, right: 0, bottom: 0,
         height: 160,
@@ -86,13 +87,16 @@ class _PortraitLayout extends StatelessWidget {
           ),
         ),
       ),
-      Positioned(
-        left: 40,
-        right: 40,
-        bottom: 40,
+      // Align guarantees perfect horizontal centering.
+      // FractionallySizedBox(0.72) matches sign width in this asset.
+      Align(
+        alignment: const Alignment(0, 0.94),
         child: SafeArea(
           top: false,
-          child: _RetryButton(busy: busy, onTap: onRetry),
+          child: FractionallySizedBox(
+            widthFactor: 0.72,
+            child: _RetryButton(busy: busy, onTap: onRetry),
+          ),
         ),
       ),
     ]);
@@ -100,8 +104,9 @@ class _PortraitLayout extends StatelessWidget {
 }
 
 // ─── Landscape ───────────────────────────────────────────────────────────────
-// Horizontal image. The sign occupies the centre-left area of the asset;
-// we place the button at the far right bottom so it never overlaps the sign.
+// Horizontal asset: 1585×673. With BoxFit.cover on a typical landscape screen
+// (~900×400) the image is scaled by height (0.594×). The sign in the image
+// spans ≈38 % of image width → ~38 % of visible screen width.
 
 class _LandscapeLayout extends StatelessWidget {
   final bool busy;
@@ -111,21 +116,30 @@ class _LandscapeLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final w = size.width;
-
     return Stack(fit: StackFit.expand, children: [
       Image.asset(
         'assets/Horizontal_Nowifi_Screen.webp',
         fit: BoxFit.cover,
         gaplessPlayback: true,
       ),
-      // Centered button placed precisely below the sign.
-      // We use Align so it is guaranteed to be horizontally centred.
+      Positioned(
+        left: 0, right: 0, bottom: 0,
+        height: 100,
+        child: const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0x00000000), Color(0x99000000)],
+            ),
+          ),
+        ),
+      ),
+      // Align(0, …) = horizontally centred. widthFactor matches sign width.
       Align(
-        alignment: const Alignment(0, 0.92),
-        child: SizedBox(
-          width: w * 0.42,
+        alignment: const Alignment(0, 0.94),
+        child: FractionallySizedBox(
+          widthFactor: 0.38,
           child: _RetryButton(busy: busy, onTap: onRetry),
         ),
       ),
