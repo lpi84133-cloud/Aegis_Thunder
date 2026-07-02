@@ -1,8 +1,8 @@
 name: aegis_thunder
-description: "Aegis Thunder - deflect Zeus's lightning bolts."
+description: "Aegis Thunder — deflect the storm."
 publish_to: 'none'
 
-version: 1.0.1+1
+version: 1.0.2+2
 
 environment:
   sdk: ^3.12.2
@@ -11,22 +11,41 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
-  webview_flutter: ^4.10.0
-  shared_preferences: ^2.3.2
+
+  # ── Gray-flow stack ─────────────────────────────
+  appsflyer_sdk: ^6.15.2
+  firebase_core: ^3.14.0
+  firebase_messaging: ^15.2.5
+  firebase_app_check: ^0.3.2+10
+  flutter_local_notifications: ^18.0.0
+  connectivity_plus: ^6.1.5
+  device_info_plus: ^11.4.0
+  package_info_plus: ^8.3.1
+  video_player: ^2.9.5
+  url_launcher: ^6.3.2
+  webview_flutter: ^4.13.0
+  webview_flutter_android: ^4.10.0
+  flutter_secure_storage: ^10.0.0
+  shared_preferences: ^2.5.2
+  http: ^1.2.2
+  # locked (Kotlin-only 10.x breaks GeneratedPluginRegistrant — see gray_part_pitfalls #1)
+  file_picker: 8.1.4
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  flutter_launcher_icons: ^0.14.1
+  flutter_launcher_icons: ^0.14.4
   image: ^4.9.1
 
 flutter_launcher_icons:
-  android: true
+  android: "launcher_icon"
   ios: false
-  image_path: "assets/icon.png"
+  image_path: "assets/icon2.png"
   min_sdk_android: 21
   remove_alpha_ios: true
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: "assets/icon2.png"
 
 flutter:
   uses-material-design: true
@@ -38,9 +57,14 @@ flutter:
     - assets/horizontalloading.webp
     - assets/verticalloading.webp
     - assets/icon.png
+    - assets/icon2.png
     - assets/icon_padded.png
     - assets/lightbolt.webp
     - assets/logo.webp
     - assets/shield.webp
     - assets/target.webp
     - assets/zeus.webp
+    - assets/Horizontal_Notifications_Screen .webp
+    - assets/Horizontal_Nowifi_Screen.webp
+    - assets/Vertical_Notifications_Screen.webp
+    - assets/Vertical_Nowifi_Screen.webp

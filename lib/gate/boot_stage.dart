@@ -74,8 +74,8 @@ class _BootStageState extends State<BootStage> with TickerProviderStateMixin {
     switch (mode) {
       case RunMode.arcade:
         // White part — go straight to game without any network calls.
-        await _animTo(0.45, 400);
-        await _animTo(1.0, 600);
+        await _animTo(0.5, 50);
+        await _animTo(1.0, 100);
         _goToArcade();
         return;
       case RunMode.portal:
@@ -88,14 +88,12 @@ class _BootStageState extends State<BootStage> with TickerProviderStateMixin {
   }
 
   Future<void> _handleFirstLaunch() async {
-    // Step 1 — initial flash (0 → 15 %)
-    await _animTo(0.15, 300);
+    await _animTo(0.10, 0);
 
-    // Step 2 — network probe
     if (!await widget.netProbe.isLive()) {
       if (ShellSettings.gatewayUrl.isEmpty) {
         await widget.vault.writeMode(RunMode.arcade);
-        await _animTo(1.0, 500);
+        await _animTo(1.0, 100);
         _goToArcade();
       } else {
         _goToOfflineNotice();
@@ -103,27 +101,23 @@ class _BootStageState extends State<BootStage> with TickerProviderStateMixin {
       return;
     }
 
-    // Step 3 — start attribution (15 → 30 %)
-    await _animTo(0.30, 200);
+    await _animTo(0.25, 0);
     await widget.bureau.start();
 
-    // Step 4 — waiting for AppsFlyer callback (30 → 70 %)
-    await _animTo(0.70, 200);
+    await _animTo(0.50, 0);
     await Future.wait([
       widget.bureau.waitForInstall(),
       widget.bureau.waitForDeepLink(),
     ]);
 
-    // Step 5 — gateway call (70 → 90 %)
-    await _animTo(0.90, 200);
+    await _animTo(0.80, 0);
     final payload = await widget.bureau.composePayload(
       locale: _currentLocale(),
       pushToken: widget.alerts.token,
     );
     final reply = await widget.gateway.submit(payload);
 
-    // Step 6 — done (90 → 100 %)
-    await _animTo(1.0, 350);
+    await _animTo(1.0, 100);
 
     if (reply.approved && reply.destination != null) {
       await widget.vault.writeMode(RunMode.portal);
@@ -135,30 +129,30 @@ class _BootStageState extends State<BootStage> with TickerProviderStateMixin {
   }
 
   Future<void> _handleReturningPortal() async {
-    await _animTo(0.20, 250);
+    await _animTo(0.15, 0);
 
     if (!await widget.netProbe.isLive()) {
-      await _animTo(1.0, 300);
+      await _animTo(1.0, 100);
       _goToOfflineNotice();
       return;
     }
 
     final pushed = await widget.vault.takePushUrl();
     if (pushed != null) {
-      await _animTo(1.0, 250);
+      await _animTo(1.0, 100);
       _goToPortal(pushed);
       return;
     }
 
-    await _animTo(0.40, 200);
+    await _animTo(0.35, 0);
     final cached = await widget.vault.readOfferUrl();
 
     await widget.bureau.start();
     await Future.wait([
-      widget.bureau.waitForInstall(within: const Duration(seconds: 10)),
-      widget.bureau.waitForDeepLink(within: const Duration(seconds: 4)),
+      widget.bureau.waitForInstall(within: const Duration(seconds: 5)),
+      widget.bureau.waitForDeepLink(within: const Duration(seconds: 2)),
     ]);
-    await _animTo(0.80, 150);
+    await _animTo(0.80, 0);
 
     final payload = await widget.bureau.composePayload(
       locale: _currentLocale(),
@@ -166,7 +160,7 @@ class _BootStageState extends State<BootStage> with TickerProviderStateMixin {
     );
     final reply = await widget.gateway.submit(payload);
 
-    await _animTo(1.0, 350);
+    await _animTo(1.0, 100);
 
     if (reply.approved && reply.destination != null) {
       _goToPortal(reply.destination!);
@@ -183,10 +177,12 @@ class _BootStageState extends State<BootStage> with TickerProviderStateMixin {
     if (!mounted) return;
     await _barCtrl.animateTo(
       target.clamp(0.0, 1.0),
-      duration: const Duration(milliseconds: 700),
-      curve: Curves.easeInOut,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
     );
-    await Future<void>.delayed(Duration(milliseconds: holdMs));
+    if (holdMs > 0) {
+      await Future<void>.delayed(Duration(milliseconds: holdMs));
+    }
   }
 
   void _reSubmitWithNewToken(String newToken) async {

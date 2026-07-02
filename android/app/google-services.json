@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "829309830652",
+    "project_id": "aegis-thunder",
+    "storage_bucket": "aegis-thunder.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:829309830652:android:d6a71ee3486f8f693c9e79",
+        "android_client_info": {
+          "package_name": "com.aegisthund.aegisthunder"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAcB3yqN-aldNUrVE6lQ5KcFTXO1srpu-I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

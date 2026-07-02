@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Monochrome flame icon used as the FCM notification small icon.
+     Must be a single-colour drawable (Android tints it) — do NOT reuse the
+     launcher icon here. Path traces a stylised flame with an inner tongue. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M13.5,0.67c0,0 2.31,3.9 2.31,6.34c0,2.34 -1.54,4.24 -3.87,4.24c-2.34,0 -4.11,-1.9 -4.11,-4.24l0.03,-0.41c-2.29,2.72 -3.66,6.24 -3.66,10.04C4.2,20.35 7.85,24 12.34,24s8.13,-3.65 8.13,-8.36C20.47,10.13 17.7,4.98 13.5,0.67zM12.03,21c-1.81,0 -3.28,-1.43 -3.28,-3.19c0,-1.64 1.06,-2.8 2.84,-3.16c1.79,-0.36 3.64,-1.22 4.66,-2.61c0.39,1.29 0.6,2.65 0.6,4.05C16.85,18.83 14.69,21 12.03,21z"/>
+</vector>

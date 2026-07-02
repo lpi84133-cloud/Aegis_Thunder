@@ -76,6 +76,8 @@ class _AlertPromptStageState extends State<AlertPromptStage> {
         final btnWidth =
             horiz ? size.width * 0.38 : double.infinity;
         final hPad = horiz ? size.width * 0.08 : 28.0;
+        // Shift the button block 10 px to the left in portrait.
+        const double portraitShift = 10.0;
         final vPad = horiz ? 14.0 : 36.0;
 
         return Stack(fit: StackFit.expand, children: [
@@ -97,8 +99,8 @@ class _AlertPromptStageState extends State<AlertPromptStage> {
 
           // ── Buttons ─────────────────────────────────────
           Positioned(
-            left: hPad,
-            right: hPad,
+            left: horiz ? hPad : hPad - portraitShift,
+            right: horiz ? hPad : hPad + portraitShift,
             bottom: vPad,
             child: SafeArea(
               top: false,

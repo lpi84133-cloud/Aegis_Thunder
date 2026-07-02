@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../env/legal_links.dart';
+import '../gate/legal_reader_stage.dart';
 import 'level_select_screen.dart';
-import 'webview_screen.dart';
 
 class MainMenuScreen extends StatelessWidget {
   const MainMenuScreen({super.key});
-
-  static const _privacyUrl =
-      'https://aegisthunder.com/privacy-policy.html';
-  static const _supportUrl = 'https://aegisthunder.com/support.html';
 
   @override
   Widget build(BuildContext context) {
@@ -56,9 +53,9 @@ class MainMenuScreen extends StatelessWidget {
                           onTap: () {
                             Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) => const WebViewScreen(
+                                builder: (_) => const LegalReaderStage(
                                   title: 'Privacy Policy',
-                                  url: _privacyUrl,
+                                  url: kPrivacyPolicyUrl,
                                 ),
                               ),
                             );
@@ -71,9 +68,9 @@ class MainMenuScreen extends StatelessWidget {
                           onTap: () {
                             Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) => const WebViewScreen(
+                                builder: (_) => const LegalReaderStage(
                                   title: 'Support',
-                                  url: _supportUrl,
+                                  url: kSupportUrl,
                                 ),
                               ),
                             );
