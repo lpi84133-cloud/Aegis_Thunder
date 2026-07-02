@@ -128,6 +128,8 @@ class _PortalStageState extends State<PortalStage>
     final ctrl = _web.platform as AndroidWebViewController;
     ctrl.setMediaPlaybackRequiresUserGesture(false);
     ctrl.setOnShowFileSelector(_pickFilesForWeb);
+    // Keep text at 100 % so the page is not artificially enlarged.
+    ctrl.setTextZoom(100);
 
     final cookies = AndroidWebViewCookieManager(
       AndroidWebViewCookieManagerCreationParams
@@ -306,11 +308,19 @@ class _PortalStageState extends State<PortalStage>
     if (kbUp()) return; // don't reflow during keyboard animation
     var head = document.head || document.documentElement;
     if (!head) return;
+    // Force a device-width viewport so the page is not zoomed in.
+    // Some sites omit the viewport meta or set a fixed width, which
+    // makes Android WebView render the page at its natural (large) size.
     var meta = document.querySelector('meta[name="viewport"]');
-    if (meta && !/viewport-fit\s*=\s*contain/i.test(meta.getAttribute('content') || '')) {
-      var current = (meta.getAttribute('content') || '')
-        .replace(/,?\s*viewport-fit\s*=\s*\w+/ig, '').trim();
-      meta.setAttribute('content', current + (current ? ', ' : '') + 'viewport-fit=contain');
+    var desired = 'width=device-width, initial-scale=1.0, '
+      + 'maximum-scale=1.0, user-scalable=no, viewport-fit=contain';
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'viewport');
+      head.appendChild(meta);
+    }
+    if (meta.getAttribute('content') !== desired) {
+      meta.setAttribute('content', desired);
     }
     var el = document.getElementById(STYLE_ID);
     if (!el) {
