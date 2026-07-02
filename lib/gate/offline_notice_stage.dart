@@ -120,27 +120,25 @@ class _LandscapeLayout extends StatelessWidget {
         fit: BoxFit.cover,
         gaplessPlayback: true,
       ),
-      // Gradient at the right edge + bottom so button is readable.
+      // Gradient at the bottom for button readability.
       Positioned(
-        right: 0,
-        top: 0,
-        bottom: 0,
-        width: w * 0.45,
+        left: 0, right: 0, bottom: 0,
+        height: 100,
         child: const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
               colors: [Color(0x00000000), Color(0xAA000000)],
             ),
           ),
         ),
       ),
-      // Button anchored to the bottom-right quadrant.
+      // Button centered horizontally at the bottom.
       Positioned(
-        right: 36,
-        bottom: 24,
-        width: w * 0.38,
+        left: w * 0.3,
+        right: w * 0.3,
+        bottom: 20,
         child: SafeArea(
           top: false,
           child: _RetryButton(busy: busy, onTap: onRetry),
