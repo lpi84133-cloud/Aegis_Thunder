@@ -108,9 +108,7 @@ class _PortraitLayout extends StatelessWidget {
 }
 
 // ─── Landscape ───────────────────────────────────────────────────────────────
-// Horizontal asset: 1585×673. With BoxFit.cover on a typical landscape screen
-// (~900×400) the image is scaled by height (0.594×). The sign in the image
-// spans ≈38 % of image width → ~38 % of visible screen width.
+// Horizontal asset (updated). Sign is centred; button sits just below it.
 
 class _LandscapeLayout extends StatelessWidget {
   final bool busy;
@@ -141,17 +139,30 @@ class _LandscapeLayout extends StatelessWidget {
       ),
       // Full SafeArea — in landscape the camera cutout is often on
       // the left edge; SafeArea.left ensures buttons stay visible.
+      // Margins are proportional to the source asset (2400x1080):
+      // 820px side margins, 129px bottom margin, 98px height — scaled
+      // to whatever logical size the screen actually renders at, so
+      // the button never overflows off-screen on smaller devices.
       Positioned.fill(
         child: SafeArea(
-          child: Align(
-            alignment: const Alignment(-0.02, 1.0),
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: FractionallySizedBox(
-                widthFactor: 0.34,
-                child: _RetryButton(busy: busy, onTap: onRetry),
-              ),
-            ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              const assetW = 2400.0, assetH = 1080.0;
+              final sideMargin = constraints.maxWidth * (820 / assetW);
+              final bottomMargin = constraints.maxHeight * (129 / assetH);
+              final btnHeight = constraints.maxHeight * (98 / assetH);
+              return Stack(
+                children: [
+                  Positioned(
+                    left: sideMargin,
+                    right: sideMargin,
+                    bottom: bottomMargin,
+                    height: btnHeight,
+                    child: _RetryButton(busy: busy, onTap: onRetry),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),

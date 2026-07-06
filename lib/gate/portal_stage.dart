@@ -287,6 +287,10 @@ class _PortalStageState extends State<PortalStage>
   window.__atsaRunning = true;
 
   var STYLE_ID = '__ats_style';
+  // Only zero-out the CSS custom properties that sites use for
+  // safe-area env() padding — this removes notch white-bands.
+  // We intentionally DO NOT touch padding-left/right or margin on
+  // html/body/#app — that would destroy the site's own layout.
   var CSS = ':root{'
     + '--safe-area-inset-top:0px!important;'
     + '--safe-area-inset-right:0px!important;'
@@ -296,9 +300,9 @@ class _PortalStageState extends State<PortalStage>
     + '--sab:0px!important;--sal:0px!important;'
     + '--safe-top:0px!important;--safe-right:0px!important;'
     + '--safe-bottom:0px!important;--safe-left:0px!important;}'
-    + 'html,body,#__nuxt,#__layout,#app,#root{'
-    + 'padding-top:0!important;padding-left:0!important;'
-    + 'padding-right:0!important;margin-top:0!important;}';
+    // Only service header wrappers get their top padding zeroed.
+    + '.gameview-mobile-header,.app-header{'
+    + 'padding-top:0!important;margin-top:0!important;}';
 
   function kbUp() {
     if (!window.visualViewport) return false;
