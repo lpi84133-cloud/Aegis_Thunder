@@ -92,7 +92,7 @@ class _PortraitLayout extends StatelessWidget {
       Positioned.fill(
         child: SafeArea(
           child: Align(
-            alignment: const Alignment(0.06, 1.0),
+            alignment: const Alignment(0.03, 1.0),
             child: Padding(
               padding: const EdgeInsets.only(bottom: 24),
               child: FractionallySizedBox(
