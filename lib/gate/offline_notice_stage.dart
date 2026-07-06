@@ -144,7 +144,7 @@ class _LandscapeLayout extends StatelessWidget {
       Positioned.fill(
         child: SafeArea(
           child: Align(
-            alignment: const Alignment(0.03, 1.0),
+            alignment: const Alignment(-0.02, 1.0),
             child: Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: FractionallySizedBox(
