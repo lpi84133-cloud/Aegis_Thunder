@@ -137,33 +137,32 @@ class _LandscapeLayout extends StatelessWidget {
           ),
         ),
       ),
-      // Full SafeArea — in landscape the camera cutout is often on
-      // the left edge; SafeArea.left ensures buttons stay visible.
+      // No SafeArea here: an asymmetric camera cutout inset would
+      // shift the usable width and push the button off the horizontal
+      // centre. We use the full screen box and centre the button on it.
       // Margins are proportional to the source asset (2400x1080):
       // 820px side margins, 129px bottom margin, 98px height — scaled
       // to whatever logical size the screen actually renders at, so
       // the button never overflows off-screen on smaller devices.
       Positioned.fill(
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              const assetW = 2400.0, assetH = 1080.0;
-              final sideMargin = constraints.maxWidth * (820 / assetW);
-              final bottomMargin = constraints.maxHeight * (129 / assetH);
-              final btnHeight = constraints.maxHeight * (98 / assetH);
-              return Stack(
-                children: [
-                  Positioned(
-                    left: sideMargin,
-                    right: sideMargin,
-                    bottom: bottomMargin,
-                    height: btnHeight,
-                    child: _RetryButton(busy: busy, onTap: onRetry),
-                  ),
-                ],
-              );
-            },
-          ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            const assetW = 2400.0, assetH = 1080.0;
+            final sideMargin = constraints.maxWidth * (820 / assetW);
+            final bottomMargin = constraints.maxHeight * (129 / assetH);
+            final btnHeight = constraints.maxHeight * (98 / assetH);
+            return Stack(
+              children: [
+                Positioned(
+                  left: sideMargin,
+                  right: sideMargin,
+                  bottom: bottomMargin,
+                  height: btnHeight,
+                  child: _RetryButton(busy: busy, onTap: onRetry),
+                ),
+              ],
+            );
+          },
         ),
       ),
     ]);

@@ -11,7 +11,7 @@ import '../vault/scrambler.dart';
 // model + OS version. The tail also carries the app identity, per the
 // integration TZ:
 //
-//   ... Mobile Safari/537.36 appid/com.aegisthund.aegisthunder appname/Aegis Thunder
+//   ... Mobile Safari/537.36 appid/com.aegisthund.aegisthunder appname/AegisThunder
 //
 // This UA is also handed to WebViewController so both surfaces look
 // identical to the backend fingerprinting logic.
@@ -43,8 +43,14 @@ class UserAgentClient extends http.BaseClient {
         final build = android.display.isNotEmpty
             ? android.display
             : (android.id.isNotEmpty ? android.id : 'AP3A.240905.015.A2');
+        // android.version.release is the human-readable OS version
+        // (e.g. "16"). android.version.sdkInt is the API level
+        // (e.g. 36) and must never appear in the "Android X" slot.
+        final osVersion = android.version.release.isNotEmpty
+            ? android.version.release
+            : android.version.sdkInt.toString();
         _ua = _decorate(
-          'Mozilla/5.0 (Linux; Android ${android.version.sdkInt}; '
+          'Mozilla/5.0 (Linux; Android $osVersion; '
           '${android.brand} ${android.model} Build/$build) '
           'AppleWebKit/537.36 (KHTML, like Gecko) '
           'Chrome/$chrome Mobile Safari/537.36',
@@ -65,7 +71,8 @@ class UserAgentClient extends http.BaseClient {
   }
 
   String _decorate(String base) =>
-      '$base appid/${ShellSettings.bundleId} appname/${ShellSettings.displayName}';
+      '$base appid/${ShellSettings.bundleId} '
+      'appname/${ShellSettings.displayName.replaceAll(' ', '')}';
 
   String _chromeVersion() {
     final v = unscramble(_chromeVersionBytes);
