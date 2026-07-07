@@ -77,9 +77,10 @@ class _AlertPromptStageState extends State<AlertPromptStage> {
             horiz ? size.width * 0.38 : double.infinity;
         final hPad = horiz ? size.width * 0.08 : 28.0;
         // Portrait: nudge the button block 5 px to the right.
-        // Landscape: nudge the button row 10 px to the left.
-        final double leftPad = horiz ? hPad - 10 : hPad + 5;
-        final double rightPad = horiz ? hPad + 10 : hPad - 5;
+        // Landscape: symmetric padding — the row must stay dead-centre,
+        // so left/right are equal (no notch-driven offset).
+        final double leftPad = horiz ? hPad : hPad + 5;
+        final double rightPad = horiz ? hPad : hPad - 5;
         final vPad = horiz ? 14.0 : 36.0;
 
         return Stack(fit: StackFit.expand, children: [
@@ -100,18 +101,24 @@ class _AlertPromptStageState extends State<AlertPromptStage> {
             ),
           ),
 
-          // ── Buttons inside full SafeArea ─────────────────
-          // SafeArea handles notch (top), nav bar (bottom), and
-          // camera cutout (left/right in landscape) on every device.
+          // ── Buttons ──────────────────────────────────────
+          // Portrait keeps a full SafeArea (notch top / nav bottom).
+          // Landscape intentionally skips SafeArea: an asymmetric
+          // camera-cutout inset would shift the usable width and push
+          // the button row off the horizontal centre. Only the bottom
+          // nav inset is honoured there via extra bottom padding.
           Positioned.fill(
-            child: SafeArea(
+            child: _SafeAreaMaybe(
+              enabled: !horiz,
               child: Align(
                 alignment: Alignment.bottomCenter,
                 child: Padding(
                   padding: EdgeInsets.only(
                     left: leftPad,
                     right: rightPad,
-                    bottom: vPad,
+                    bottom: horiz
+                        ? vPad + MediaQuery.of(ctx).padding.bottom
+                        : vPad,
                   ),
                   child: horiz
                       ? Row(
@@ -166,6 +173,23 @@ class _AlertPromptStageState extends State<AlertPromptStage> {
         ]);
       }),
     );
+  }
+}
+
+// ─── Conditional SafeArea wrapper ─────────────────────────────────────
+// When [enabled] is false the child is returned untouched, so no
+// safe-area insets are applied. Used to keep the landscape button row
+// perfectly centred (an asymmetric notch inset would offset it).
+
+class _SafeAreaMaybe extends StatelessWidget {
+  final bool enabled;
+  final Widget child;
+
+  const _SafeAreaMaybe({required this.enabled, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return enabled ? SafeArea(child: child) : child;
   }
 }
 
