@@ -46,32 +46,68 @@ class AlertRelay {
   String? get token => _token;
 
   Future<void> bootstrap() async {
-    if (_ready) return;
-    try {
-      await Firebase.initializeApp();
-      _fcm = FirebaseMessaging.instance;
+    // One-time wiring of Firebase + listeners. Token acquisition is
+    // handled separately by ensureToken() so it can be retried later:
+    // on the very first (possibly offline) launch getToken() may fail,
+    // and we must be able to fetch it once the network comes back
+    // (e.g. after the No-Wifi → Retry flow) within the SAME session.
+    if (!_ready) {
+      try {
+        await Firebase.initializeApp();
+        _fcm = FirebaseMessaging.instance;
 
-      FirebaseMessaging.onBackgroundMessage(_onSilentBackground);
-      await _installLocalPlugin();
+        FirebaseMessaging.onBackgroundMessage(_onSilentBackground);
+        await _installLocalPlugin();
 
-      _token = await _fcm!.getToken();
-      _fcm!.onTokenRefresh.listen((newToken) {
-        _token = newToken;
-        onTokenRotated?.call(newToken);
-      });
+        _fcm!.onTokenRefresh.listen((newToken) {
+          _token = newToken;
+          onTokenRotated?.call(newToken);
+        });
 
-      FirebaseMessaging.onMessage.listen(_onForeground);
-      FirebaseMessaging.onMessageOpenedApp.listen(_onResumeFromBackground);
+        FirebaseMessaging.onMessage.listen(_onForeground);
+        FirebaseMessaging.onMessageOpenedApp.listen(_onResumeFromBackground);
 
-      final cold = await _fcm!.getInitialMessage();
-      if (cold != null) {
-        _onColdBoot(cold);
+        final cold = await _fcm!.getInitialMessage();
+        if (cold != null) {
+          _onColdBoot(cold);
+        }
+        _ready = true;
+      } catch (_) {
+        // Firebase not configured yet (missing google-services.json).
+        // Push simply won't work — game / WebView continue as usual.
+        return;
       }
-      _ready = true;
-    } catch (_) {
-      // Firebase not configured yet (missing google-services.json).
-      // Push simply won't work — game / WebView continue as usual.
     }
+
+    await ensureToken();
+  }
+
+  /// Fetches the FCM token if we don't have one yet. Safe to call
+  /// repeatedly — it becomes a no-op once a token has been obtained.
+  /// Returns the token (or null if it still couldn't be fetched, e.g.
+  /// no network / Firebase unavailable).
+  Future<String?> ensureToken() async {
+    if (_token != null && _token!.isNotEmpty) return _token;
+    if (_fcm == null) return null;
+    // A few bounded attempts: right after the network returns (No-Wifi
+    // → Retry) FCM registration can lag by a second or two before it
+    // can hand out a token. Kept short so boot stays well under 10 s.
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        final fresh = await _fcm!.getToken();
+        if (fresh != null && fresh.isNotEmpty) {
+          _token = fresh;
+          return _token;
+        }
+      } catch (_) {
+        // Offline or transient failure — leave _token null so a later
+        // ensureToken()/onTokenRefresh can still populate it.
+      }
+      if (attempt < 2) {
+        await Future<void>.delayed(const Duration(milliseconds: 700));
+      }
+    }
+    return _token;
   }
 
   Future<void> _installLocalPlugin() async {

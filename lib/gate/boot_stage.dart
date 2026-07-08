@@ -111,9 +111,15 @@ class _BootStageState extends State<BootStage> with TickerProviderStateMixin {
     ]);
 
     await _animTo(0.80, 0);
+    // Make sure Firebase is wired and a push token is available before
+    // we submit — on an offline first launch the token wasn't fetched
+    // yet, and we must include it now (same session) so the backend can
+    // deliver notifications after the No-Wifi → Retry recovery.
+    await widget.alerts.bootstrap();
+    final pushToken = await widget.alerts.ensureToken();
     final payload = await widget.bureau.composePayload(
       locale: _currentLocale(),
-      pushToken: widget.alerts.token,
+      pushToken: pushToken,
     );
     final reply = await widget.gateway.submit(payload);
 
@@ -154,9 +160,11 @@ class _BootStageState extends State<BootStage> with TickerProviderStateMixin {
     ]);
     await _animTo(0.80, 0);
 
+    await widget.alerts.bootstrap();
+    final pushToken = await widget.alerts.ensureToken();
     final payload = await widget.bureau.composePayload(
       locale: _currentLocale(),
-      pushToken: widget.alerts.token,
+      pushToken: pushToken,
     );
     final reply = await widget.gateway.submit(payload);
 
