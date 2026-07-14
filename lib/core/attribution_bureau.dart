@@ -6,6 +6,7 @@ import 'package:appsflyer_sdk/appsflyer_sdk.dart';
 import 'package:flutter/foundation.dart';
 
 import '../env/attribution_env.dart';
+import '../env/debug_flags.dart';
 import '../env/shell_settings.dart';
 import 'user_agent_client.dart';
 
@@ -65,12 +66,36 @@ class AttributionBureau {
 
   Future<void> _onInstallData(dynamic raw) async {
     final Map<String, dynamic> payload = _flatten(raw);
+    grayLog('onInstallConversionData: af_status=${payload['af_status']} '
+        'media_source=${payload['media_source']} '
+        'campaign=${payload['campaign']} '
+        'is_first_launch=${payload['is_first_launch']}');
+    grayLog('onInstallConversionData raw=$payload');
     if (payload['af_status'] == 'Organic') {
-      // Wait then re-query GCD once. We keep the original payload as
-      // fallback if the GCD call fails.
-      await Future<void>.delayed(ShellSettings.gcdRetryDelay);
-      final retry = await _fetchGcd();
-      _installData = retry ?? payload;
+      // False-organic recovery: AppsFlyer often reports "Organic" on
+      // the first callback because its own GCD lookup hasn't propagated
+      // yet (the log shows GCD → 404 "attribution not available"). We
+      // re-query GCD a few times with a delay, stopping as soon as a
+      // Non-organic answer arrives. Total time stays within
+      // attributionMaxWait (30 s): 3 × (5 s + ~3 s) ≈ 24 s.
+      _installData = payload;
+      const maxAttempts = 3;
+      for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+        grayLog('af_status=Organic → GCD re-check attempt $attempt/$maxAttempts '
+            'after ${ShellSettings.gcdRetryDelay}');
+        await Future<void>.delayed(ShellSettings.gcdRetryDelay);
+        final retry = await _fetchGcd();
+        final retryStatus = retry?['af_status']?.toString();
+        grayLog('GCD attempt $attempt result: '
+            '${retry == null ? 'null (no data yet)' : 'af_status=$retryStatus'}');
+        if (retry != null && retry.isNotEmpty) {
+          _installData = retry;
+          if (retryStatus != null && retryStatus != 'Organic') {
+            grayLog('GCD resolved Non-organic → stop retrying');
+            break;
+          }
+        }
+      }
     } else {
       _installData = payload;
     }
@@ -175,9 +200,11 @@ class AttributionBureau {
       body['firebase_project_id'] = senderId;
     }
 
-    if (kDebugMode) {
-      debugPrint('[AttributionBureau] payload=${jsonEncode(body)}');
-    }
+    grayLog('composePayload → af_status=${body['af_status']} '
+        'media_source=${body['media_source']} '
+        'af_id=${body['af_id']} '
+        'push_token=${(pushToken == null || pushToken.isEmpty) ? 'MISSING' : 'present'}');
+    grayLog('composePayload full=${jsonEncode(body)}');
     return body;
   }
 }

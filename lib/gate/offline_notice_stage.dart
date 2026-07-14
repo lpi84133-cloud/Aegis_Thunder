@@ -92,12 +92,14 @@ class _PortraitLayout extends StatelessWidget {
       Positioned.fill(
         child: SafeArea(
           child: Align(
-            alignment: const Alignment(-0.03, 1.0),
+            // Centred so the button sits squarely under the sign's
+            // text frame (the sign is horizontally centred in the art).
+            alignment: const Alignment(0.0, 1.0),
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 24),
+              padding: const EdgeInsets.only(bottom: 26),
               child: FractionallySizedBox(
-                widthFactor: 0.78,
-                child: _RetryButton(busy: busy, onTap: onRetry),
+                widthFactor: 0.72,
+                child: _RetryButton(busy: busy, onTap: onRetry, height: 56),
               ),
             ),
           ),
@@ -140,23 +142,28 @@ class _LandscapeLayout extends StatelessWidget {
       // No SafeArea here: an asymmetric camera cutout inset would
       // shift the usable width and push the button off the horizontal
       // centre. We use the full screen box and centre the button on it.
-      // Margins are proportional to the source asset (2400x1080):
-      // 820px side margins, 129px bottom margin, 98px height — scaled
-      // to whatever logical size the screen actually renders at, so
-      // the button never overflows off-screen on smaller devices.
+      //
+      // Geometry measured from the source art (1584×672): the gilded sign
+      // board spans ~39 % of the image width, centred, and its bottom edge
+      // sits at ~82 % of the image height. With BoxFit.cover the sides are
+      // cropped, widening the board to ≈42 % of the visible width while the
+      // vertical position is preserved. We size the button to that width and
+      // drop it just beneath the board so it lines up with the frame.
       Positioned.fill(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            const assetW = 2400.0, assetH = 1080.0;
-            final sideMargin = constraints.maxWidth * (820 / assetW);
-            final bottomMargin = constraints.maxHeight * (129 / assetH);
-            final btnHeight = constraints.maxHeight * (98 / assetH);
+            final w = constraints.maxWidth;
+            final h = constraints.maxHeight;
+            final btnWidth = w * 0.43; // matches the sign frame width
+            final btnHeight = h * 0.135;
+            final left = (w - btnWidth) / 2; // centred under the sign
+            final bottom = h * 0.05; // sits low, right under the board
             return Stack(
               children: [
                 Positioned(
-                  left: sideMargin,
-                  right: sideMargin,
-                  bottom: bottomMargin,
+                  left: left,
+                  width: btnWidth,
+                  bottom: bottom,
                   height: btnHeight,
                   child: _RetryButton(busy: busy, onTap: onRetry),
                 ),
@@ -175,7 +182,11 @@ class _RetryButton extends StatefulWidget {
   final bool busy;
   final VoidCallback onTap;
 
-  const _RetryButton({required this.busy, required this.onTap});
+  /// Explicit height (portrait). Left null in landscape, where the
+  /// parent Positioned already constrains the height.
+  final double? height;
+
+  const _RetryButton({required this.busy, required this.onTap, this.height});
 
   @override
   State<_RetryButton> createState() => _RetryButtonState();
@@ -184,9 +195,15 @@ class _RetryButton extends StatefulWidget {
 class _RetryButtonState extends State<_RetryButton> {
   bool _pressed = false;
 
+  // Palette pulled from the No-Wifi artwork: gold ornate frame around a
+  // warm marble/ivory plate, with deep-bronze engraved lettering.
+  static const _bronze = Color(0xFF4A3410); // dark frame / text
+  static const _goldTop = Color(0xFFF7E4A6); // light gold highlight
+  static const _goldMid = Color(0xFFE7C05A); // core gold
+  static const _goldLow = Color(0xFFC48F2C); // deep gold shade
+
   @override
   Widget build(BuildContext context) {
-    const gold = Color(0xFFE8B94A);
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
       onTapCancel: () => setState(() => _pressed = false),
@@ -197,73 +214,103 @@ class _RetryButtonState extends State<_RetryButton> {
       child: AnimatedScale(
         scale: _pressed ? 0.96 : 1.0,
         duration: const Duration(milliseconds: 90),
-        child: Container(
-          height: 50,
-          decoration: BoxDecoration(
-            color: widget.busy ? const Color(0xFF3A2A0A) : gold,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: widget.busy
-                  ? const Color(0xFF6A5015)
-                  : const Color(0xFF2A1B03),
-              width: 1.8,
+        child: SizedBox(
+          height: widget.height,
+          // Outer ornate gold frame (matches the sign's gilded border).
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: widget.busy
+                    ? const [Color(0xFF6E5A2E), Color(0xFF4A3410)]
+                    : const [_goldTop, _goldMid, _goldLow],
+                stops: widget.busy ? null : const [0.0, 0.55, 1.0],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _bronze, width: 2.2),
+              boxShadow: widget.busy
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: _goldMid.withValues(alpha: 0.5),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
             ),
-            boxShadow: widget.busy
-                ? null
-                : [
-                    BoxShadow(
-                      color: gold.withValues(alpha: 0.45),
-                      blurRadius: 14,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-          ),
-          child: Center(
-            child: widget.busy
-                ? const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                              Color(0xFFE8B94A)),
-                        ),
-                      ),
-                      SizedBox(width: 10),
-                      Text(
-                        'CONNECTING...',
-                        style: TextStyle(
-                          color: Color(0xFFE8B94A),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                    ],
-                  )
-                : const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.refresh_rounded,
-                          color: Color(0xFF1A1100), size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'TRY AGAIN',
-                        style: TextStyle(
-                          color: Color(0xFF1A1100),
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2.5,
-                        ),
-                      ),
-                    ],
+            padding: const EdgeInsets.all(3),
+            // Inner hairline that reads as an engraved bevel.
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: widget.busy
+                      ? const Color(0x33F7E4A6)
+                      : const Color(0x88FFF6D9),
+                  width: 1.2,
+                ),
+              ),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: widget.busy ? _busyContent() : _idleContent(),
                   ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _idleContent() {
+    return const Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.refresh_rounded, color: _bronze, size: 22),
+        SizedBox(width: 10),
+        Text(
+          'TRY AGAIN',
+          style: TextStyle(
+            fontFamily: 'serif',
+            color: _bronze,
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 3,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _busyContent() {
+    return const Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFF7E4A6)),
+          ),
+        ),
+        SizedBox(width: 12),
+        Text(
+          'CONNECTING...',
+          style: TextStyle(
+            fontFamily: 'serif',
+            color: Color(0xFFF7E4A6),
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 2.5,
+          ),
+        ),
+      ],
     );
   }
 }

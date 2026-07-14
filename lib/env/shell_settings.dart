@@ -16,21 +16,25 @@ class ShellSettings {
   static const String appStoreId = '';
 
   // ── Timing knobs ─────────────────────────────────────────
-  // Time to wait for the AppsFlyer install-conversion callback
-  // on first launch. If it doesn't arrive, we go ahead with an
-  // empty attribution set.
-  static const Duration attributionMaxWait = Duration(seconds: 7);
+  // Time to wait for the AppsFlyer install-conversion callback on
+  // first launch. MUST be generous: the SDK first runs its own GCD
+  // lookup (~3-4 s), and on a (false) Organic reply we add our own
+  // GCD re-check on top. If this cap is too small the gateway is
+  // called with an EMPTY attribution set (af_status=null) and the
+  // backend can only answer "organic → white". Value per
+  // android_gray_guide.md §"Gray Flow State Machine" (30 s).
+  static const Duration attributionMaxWait = Duration(seconds: 30);
 
-  // Follow-up wait for the deep-link callback (much shorter —
-  // the SDK either has a link ready almost instantly or not at all).
-  static const Duration deepLinkMaxWait = Duration(seconds: 2);
+  // Follow-up wait for the deep-link callback. Guide value: 5 s.
+  static const Duration deepLinkMaxWait = Duration(seconds: 5);
 
-  // Delay before retrying attribution via GCD when the SDK
-  // reports "Organic" on the first callback (known false positive).
-  static const Duration gcdRetryDelay = Duration(seconds: 2);
+  // Delay before retrying attribution via GCD when the SDK reports
+  // "Organic" on the first callback (known false positive). Guide
+  // value: 5 s (gives AppsFlyer time to propagate the attribution).
+  static const Duration gcdRetryDelay = Duration(seconds: 5);
 
-  // How long the config POST is allowed to take.
-  static const Duration gatewayCallTimeout = Duration(seconds: 7);
+  // How long a single config POST is allowed to take.
+  static const Duration gatewayCallTimeout = Duration(seconds: 15);
 
   // Push permission promo re-appears after this delay when the
   // user skipped it (3 days).

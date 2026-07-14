@@ -10,6 +10,7 @@ import '../core/gateway_api.dart';
 import '../core/local_vault.dart';
 import '../core/net_probe.dart';
 import '../data/run_mode.dart';
+import '../env/debug_flags.dart';
 import '../env/shell_settings.dart';
 import '../screens/main_menu_screen.dart';
 import 'alert_prompt_stage.dart';
@@ -71,9 +72,11 @@ class _BootStageState extends State<BootStage> with TickerProviderStateMixin {
     unawaited(widget.alerts.bootstrap());
 
     final mode = widget.vault.readMode();
+    grayLog('BOOT: stored RunMode=$mode gatewayConfigured=${ShellSettings.gatewayUrl.isNotEmpty}');
     switch (mode) {
       case RunMode.arcade:
         // White part — go straight to game without any network calls.
+        grayLog('BOOT: mode=arcade → straight to WHITE (game), no network');
         await _animTo(0.5, 50);
         await _animTo(1.0, 100);
         _goToArcade();
@@ -88,14 +91,19 @@ class _BootStageState extends State<BootStage> with TickerProviderStateMixin {
   }
 
   Future<void> _handleFirstLaunch() async {
+    grayLog('FIRST LAUNCH flow started');
     await _animTo(0.10, 0);
 
-    if (!await widget.netProbe.isLive()) {
+    final live = await widget.netProbe.isLive();
+    grayLog('FIRST LAUNCH: netProbe.isLive=$live');
+    if (!live) {
       if (ShellSettings.gatewayUrl.isEmpty) {
+        grayLog('FIRST LAUNCH: offline + no gateway → WHITE (permanent)');
         await widget.vault.writeMode(RunMode.arcade);
         await _animTo(1.0, 100);
         _goToArcade();
       } else {
+        grayLog('FIRST LAUNCH: offline + gateway set → No-Wifi screen');
         _goToOfflineNotice();
       }
       return;
@@ -126,18 +134,41 @@ class _BootStageState extends State<BootStage> with TickerProviderStateMixin {
     await _animTo(1.0, 100);
 
     if (reply.approved && reply.destination != null) {
+      grayLog('FIRST LAUNCH: APPROVED → GRAY (portal). mode=portal saved');
       await widget.vault.writeMode(RunMode.portal);
       _goToPortal(reply.destination!);
+    } else if (reply.responded) {
+      // Genuine backend decline (organic / no offer). Per the guide the
+      // install is normally locked to the game forever. During gray-flow
+      // debugging we skip the lock so relaunching keeps re-querying the
+      // gateway (AppsFlyer attribution can turn Non-organic a bit after
+      // install) without needing a reinstall between attempts.
+      if (kGrayFlowDebug) {
+        grayLog('FIRST LAUNCH: DECLINED by server → WHITE this session. '
+            'DEBUG: mode kept INITIAL (relaunch will re-query gateway)');
+      } else {
+        grayLog('FIRST LAUNCH: DECLINED by server → WHITE (permanent). mode=arcade saved');
+        await widget.vault.writeMode(RunMode.arcade);
+      }
+      _goToArcade();
     } else {
-      await widget.vault.writeMode(RunMode.arcade);
+      // Transient failure (timeout / network / HTTP error): DON'T lock
+      // to white. Play the game for this session but keep the mode
+      // "initial" so the next launch retries the gateway and can still
+      // reach the gray part once the call succeeds.
+      grayLog('FIRST LAUNCH: transient failure → WHITE this session, mode kept INITIAL (will retry next launch)');
       _goToArcade();
     }
   }
 
   Future<void> _handleReturningPortal() async {
+    grayLog('RETURNING PORTAL flow started');
     await _animTo(0.15, 0);
 
-    if (!await widget.netProbe.isLive()) {
+    final live = await widget.netProbe.isLive();
+    grayLog('RETURNING PORTAL: netProbe.isLive=$live');
+    if (!live) {
+      grayLog('RETURNING PORTAL: offline → No-Wifi screen');
       await _animTo(1.0, 100);
       _goToOfflineNotice();
       return;
@@ -171,10 +202,13 @@ class _BootStageState extends State<BootStage> with TickerProviderStateMixin {
     await _animTo(1.0, 100);
 
     if (reply.approved && reply.destination != null) {
+      grayLog('RETURNING PORTAL: APPROVED → GRAY (fresh url)');
       _goToPortal(reply.destination!);
     } else if (cached != null) {
+      grayLog('RETURNING PORTAL: not approved → GRAY (cached offer url)');
       _goToPortal(cached);
     } else {
+      grayLog('RETURNING PORTAL: not approved + no cache → No-Wifi screen');
       _goToOfflineNotice();
     }
   }

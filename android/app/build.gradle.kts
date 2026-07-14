@@ -73,6 +73,16 @@ android {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // Required by AppsFlyer SDK 6.x to read the Google Advertising ID
+    // (GAID). Without it AppsFlyer throws ClassNotFoundException for
+    // com.google.android.gms.ads.identifier.AdvertisingIdClient, cannot
+    // collect the GAID (isGaidWithGps=false), and can never match a
+    // click to the install — so every install is reported as "Organic"
+    // and the gray flow never activates. See AppsFlyer Android SDK docs.
+    implementation("com.google.android.gms:play-services-ads-identifier:18.0.1")
+    // AppSet ID — used by AppsFlyer 6.x as a fallback identifier.
+    implementation("com.google.android.gms:play-services-appset:16.0.2")
 }
 
 flutter {

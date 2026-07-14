@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'app.dart';
 import 'core/alert_relay.dart';
 import 'core/attribution_bureau.dart';
-import 'core/gateway_api.dart';
+import 'core/gateway_api.dart'; 
 import 'core/local_vault.dart';
 import 'core/net_probe.dart';
 import 'core/user_agent_client.dart';
