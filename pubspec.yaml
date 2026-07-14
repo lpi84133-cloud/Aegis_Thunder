@@ -30,6 +30,7 @@ dependencies:
   http: ^1.2.2
   # locked (Kotlin-only 10.x breaks GeneratedPluginRegistrant — see gray_part_pitfalls #1)
   file_picker: 8.1.4
+  clarity_flutter: ^1.9.0
 
 dev_dependencies:
   flutter_test:

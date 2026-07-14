@@ -1,5 +1,7 @@
+import 'package:clarity_flutter/clarity_flutter.dart';
 import 'package:flutter/material.dart';
 
+import 'bridge/insight.dart';
 import 'core/alert_relay.dart';
 import 'core/attribution_bureau.dart';
 import 'core/gateway_api.dart';
@@ -25,24 +27,27 @@ class AegisThunderShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Aegis Thunder',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0B0F1A),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFE8B94A),
+    return ClarityWidget(
+      clarityConfig: Insight.config,
+      app: MaterialApp(
+        title: 'Aegis Thunder',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          useMaterial3: true,
           brightness: Brightness.dark,
+          scaffoldBackgroundColor: const Color(0xFF0B0F1A),
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFFE8B94A),
+            brightness: Brightness.dark,
+          ),
         ),
-      ),
-      home: BootStage(
-        vault: vault,
-        netProbe: netProbe,
-        bureau: bureau,
-        gateway: gateway,
-        alerts: alerts,
+        home: BootStage(
+          vault: vault,
+          netProbe: netProbe,
+          bureau: bureau,
+          gateway: gateway,
+          alerts: alerts,
+        ),
       ),
     );
   }

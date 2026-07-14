@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../bridge/insight.dart';
+
 class OfflineNoticeStage extends StatefulWidget {
   final WidgetBuilder onRetry;
 
@@ -16,18 +18,19 @@ class _OfflineNoticeStageState extends State<OfflineNoticeStage> {
   @override
   void initState() {
     super.initState();
-    // Unlock both orientations so OrientationBuilder can switch assets.
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
+    Insight.screen('offline');
   }
 
   Future<void> _retry() async {
     if (_busy) return;
     setState(() => _busy = true);
+    Insight.event('offline_retry');
     await Future<void>.delayed(const Duration(milliseconds: 550));
     if (!mounted) return;
     Navigator.of(context).pushReplacement(

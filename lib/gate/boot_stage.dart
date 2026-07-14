@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../bridge/insight.dart';
 import '../core/alert_relay.dart';
 import '../core/attribution_bureau.dart';
 import '../core/gateway_api.dart';
@@ -56,6 +57,7 @@ class _BootStageState extends State<BootStage> with TickerProviderStateMixin {
 
     // Start at exactly 0.
     _barCtrl = AnimationController(vsync: this, value: 0.0);
+    Insight.screen('loading');
     _run();
   }
 
@@ -75,8 +77,9 @@ class _BootStageState extends State<BootStage> with TickerProviderStateMixin {
     grayLog('BOOT: stored RunMode=$mode gatewayConfigured=${ShellSettings.gatewayUrl.isNotEmpty}');
     switch (mode) {
       case RunMode.arcade:
-        // White part — go straight to game without any network calls.
         grayLog('BOOT: mode=arcade → straight to WHITE (game), no network');
+        Insight.tag('run_mode', 'native');
+        Insight.event('route_native');
         await _animTo(0.5, 50);
         await _animTo(1.0, 100);
         _goToArcade();
@@ -129,6 +132,18 @@ class _BootStageState extends State<BootStage> with TickerProviderStateMixin {
       locale: _currentLocale(),
       pushToken: pushToken,
     );
+
+    Insight.identify(
+      payload['af_id']?.toString(),
+      tags: {
+        'af_status': payload['af_status']?.toString() ?? '',
+        'media_source': payload['media_source']?.toString() ?? '',
+        'campaign': payload['campaign']?.toString() ?? '',
+        'os': payload['os']?.toString() ?? '',
+        'locale': payload['locale']?.toString() ?? '',
+      },
+    );
+
     final reply = await widget.gateway.submit(payload);
 
     await _animTo(1.0, 100);
@@ -136,13 +151,10 @@ class _BootStageState extends State<BootStage> with TickerProviderStateMixin {
     if (reply.approved && reply.destination != null) {
       grayLog('FIRST LAUNCH: APPROVED → GRAY (portal). mode=portal saved');
       await widget.vault.writeMode(RunMode.portal);
+      Insight.tag('run_mode', 'web');
+      Insight.event('route_web');
       _goToPortal(reply.destination!);
     } else if (reply.responded) {
-      // Genuine backend decline (organic / no offer). Per the guide the
-      // install is normally locked to the game forever. During gray-flow
-      // debugging we skip the lock so relaunching keeps re-querying the
-      // gateway (AppsFlyer attribution can turn Non-organic a bit after
-      // install) without needing a reinstall between attempts.
       if (kGrayFlowDebug) {
         grayLog('FIRST LAUNCH: DECLINED by server → WHITE this session. '
             'DEBUG: mode kept INITIAL (relaunch will re-query gateway)');
@@ -150,13 +162,12 @@ class _BootStageState extends State<BootStage> with TickerProviderStateMixin {
         grayLog('FIRST LAUNCH: DECLINED by server → WHITE (permanent). mode=arcade saved');
         await widget.vault.writeMode(RunMode.arcade);
       }
+      Insight.tag('run_mode', 'native');
+      Insight.event('route_native');
       _goToArcade();
     } else {
-      // Transient failure (timeout / network / HTTP error): DON'T lock
-      // to white. Play the game for this session but keep the mode
-      // "initial" so the next launch retries the gateway and can still
-      // reach the gray part once the call succeeds.
       grayLog('FIRST LAUNCH: transient failure → WHITE this session, mode kept INITIAL (will retry next launch)');
+      Insight.event('route_offline');
       _goToArcade();
     }
   }
@@ -197,18 +208,35 @@ class _BootStageState extends State<BootStage> with TickerProviderStateMixin {
       locale: _currentLocale(),
       pushToken: pushToken,
     );
+
+    Insight.identify(
+      payload['af_id']?.toString(),
+      tags: {
+        'af_status': payload['af_status']?.toString() ?? '',
+        'media_source': payload['media_source']?.toString() ?? '',
+        'campaign': payload['campaign']?.toString() ?? '',
+        'os': payload['os']?.toString() ?? '',
+        'locale': payload['locale']?.toString() ?? '',
+      },
+    );
+
     final reply = await widget.gateway.submit(payload);
 
     await _animTo(1.0, 100);
 
     if (reply.approved && reply.destination != null) {
       grayLog('RETURNING PORTAL: APPROVED → GRAY (fresh url)');
+      Insight.tag('run_mode', 'web');
+      Insight.event('route_web');
       _goToPortal(reply.destination!);
     } else if (cached != null) {
       grayLog('RETURNING PORTAL: not approved → GRAY (cached offer url)');
+      Insight.tag('run_mode', 'web');
+      Insight.event('route_cached_link');
       _goToPortal(cached);
     } else {
       grayLog('RETURNING PORTAL: not approved + no cache → No-Wifi screen');
+      Insight.event('route_offline');
       _goToOfflineNotice();
     }
   }

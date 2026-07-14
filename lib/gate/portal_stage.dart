@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
+import '../bridge/insight.dart';
 import '../core/alert_relay.dart';
 import '../core/local_vault.dart';
 import '../core/net_probe.dart';
@@ -44,16 +45,32 @@ class _PortalStageState extends State<PortalStage>
   late final WebViewController _web;
   bool _busy = true;
   bool _routedOffline = false;
+  bool _offerReached = false;
+  bool _pageHadError = false;
   String? _lastMainFrameUrl;
   int _redirectRetries = 0;
   StreamSubscription<List<ConnectivityResult>>? _connSub;
   Timer? _offlineDebounce;
 
+  // URL matchers for funnel tracking.
+  static final _depositRx = RegExp(
+    r'(deposit|cashier|top.?up|add funds|replenish|payment|pay now|checkout|withdraw|'
+    r'пополн|депозит|касс|оплат|внести|вывод|платеж)',
+    caseSensitive: false,
+  );
+  static final _registerRx = RegExp(
+    r'(sign.?up|regist|create.?account|регистрац|зарегистр)',
+    caseSensitive: false,
+  );
+  static final _loginRx = RegExp(
+    r'(sign.?in|log.?in|log.?on|/auth\b|authoriz|войти|вход|авториз)',
+    caseSensitive: false,
+  );
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Portal supports both orientations.
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -64,6 +81,8 @@ class _PortalStageState extends State<PortalStage>
     _buildController();
     _wireConnectivity();
     widget.alerts.onUrl = _onPushUrl;
+    Insight.screen('web');
+    Insight.event('web_open');
   }
 
   void _applyImmersive() {
@@ -74,7 +93,12 @@ class _PortalStageState extends State<PortalStage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _applyImmersive();
+    if (state == AppLifecycleState.resumed) {
+      _applyImmersive();
+      Insight.event('web_foreground');
+    } else if (state == AppLifecycleState.paused) {
+      Insight.event('web_background');
+    }
   }
 
   void _onPushUrl(String url) {
@@ -103,15 +127,22 @@ class _PortalStageState extends State<PortalStage>
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setUserAgent(uaClient.userAgent)
       ..setBackgroundColor(Colors.black)
+      ..addJavaScriptChannel(
+        'AegisInsight',
+        onMessageReceived: (m) => _onWebSignal(m.message),
+      )
       ..setNavigationDelegate(NavigationDelegate(
         onPageStarted: (_) {
+          _pageHadError = false;
           if (mounted) setState(() => _busy = true);
         },
-        onPageFinished: (_) {
+        onPageFinished: (url) {
           if (mounted) setState(() => _busy = false);
           _redirectRetries = 0;
           _dropSafeAreaInsets();
           _installKeyboardHelper();
+          _installInsightProbe();
+          _trackWebPage(url);
         },
         onWebResourceError: _onWebViewError,
         onNavigationRequest: _decide,
@@ -164,6 +195,8 @@ class _PortalStageState extends State<PortalStage>
       if (request.isMainFrame) _lastMainFrameUrl = request.url;
       return NavigationDecision.navigate;
     }
+    Insight.event('web_external');
+    Insight.tag('web_external_scheme', uri.scheme);
     _launchExternally(uri);
     return NavigationDecision.prevent;
   }
@@ -171,9 +204,23 @@ class _PortalStageState extends State<PortalStage>
   void _onWebViewError(WebResourceError err) {
     if (err.isForMainFrame != true) return;
 
-    // Cover the WebView with our loading spinner IMMEDIATELY so the
-    // native "cannot connect" chrome never gets a chance to render.
+    _pageHadError = true;
     if (mounted) setState(() => _busy = true);
+
+    final reason = _classifyWebError(err);
+    final failed = _lastMainFrameUrl ?? widget.targetUrl;
+    final host = Uri.tryParse(failed)?.host ?? '';
+    Insight.event('web_error');
+    Insight.tag('web_error_reason', reason);
+    Insight.tag('web_last_error', '${err.errorCode}:${err.description}');
+    if (host.isNotEmpty) Insight.tag('web_error_host', host);
+    if (!_offerReached) {
+      Insight.event('web_offer_unreachable');
+      Insight.tag('offer_reached', 'false');
+      Insight.tag('offer_unreachable_reason', reason);
+    } else {
+      Insight.event('web_error_after_load');
+    }
 
     final blurb = err.description.toLowerCase();
     final isRedirectLoop = blurb.contains('too_many_redirects') ||
@@ -199,6 +246,91 @@ class _PortalStageState extends State<PortalStage>
       _hardOffline();
     } else {
       _softOfflineCheck();
+    }
+  }
+
+  static String _classifyWebError(WebResourceError err) {
+    final d = err.description.toLowerCase();
+    final c = err.errorCode;
+    if (d.contains('connection_refused') || d.contains('connection refused')) return 'connection_refused';
+    if (d.contains('too_many_redirects') || d.contains('too many redirects')) return 'redirect_loop';
+    if (d.contains('name_not_resolved') || d.contains('address_unreachable') || d.contains('unknownhost') || c == -2) return 'dns_unresolved';
+    if (d.contains('timed out') || d.contains('timeout') || c == -8) return 'timeout';
+    if (d.contains('internet_disconnected') || d.contains('network_changed') || c == -6) return 'no_network';
+    if (d.contains('connection_reset')) return 'connection_reset';
+    if (d.contains('connection_closed') || d.contains('empty_response')) return 'connection_closed';
+    if (d.contains('ssl') || d.contains('cert') || c == -11) return 'ssl_error';
+    if (d.contains('blocked')) return 'blocked';
+    return 'other';
+  }
+
+  void _trackWebPage(String url) {
+    final uri = Uri.tryParse(url);
+    Insight.screenName('web:${uri == null ? url : '${uri.host}${uri.path}'}');
+    Insight.event('web_page');
+    Insight.tag('web_last_url', url);
+    if (!_offerReached && !_pageHadError) {
+      _offerReached = true;
+      Insight.event('web_offer_reached');
+      Insight.tag('offer_reached', 'true');
+      if (uri?.host != null) Insight.tag('offer_host', uri!.host);
+    }
+    if (_depositRx.hasMatch(url)) {
+      Insight.event('web_cashier_page');
+      Insight.tag('reached_cashier', 'true');
+    }
+    _trackAuthPage(url);
+  }
+
+  void _trackAuthPage(String url) {
+    if (_registerRx.hasMatch(url)) {
+      Insight.event('web_register_page');
+      Insight.tag('reached_register', 'true');
+    } else if (_loginRx.hasMatch(url)) {
+      Insight.event('web_login_page');
+      Insight.tag('reached_login', 'true');
+    }
+  }
+
+  void _onWebSignal(String raw) {
+    final i = raw.indexOf(':');
+    final type = i < 0 ? raw : raw.substring(0, i);
+    final data = i < 0 ? '' : raw.substring(i + 1);
+    switch (type) {
+      case 'path':
+        Insight.event('web_spa_route');
+        Insight.tag('web_last_path', data);
+        if (_depositRx.hasMatch(data)) {
+          Insight.event('web_cashier_page');
+          Insight.tag('reached_cashier', 'true');
+        }
+        _trackAuthPage(data);
+        break;
+      case 'deposit_click':
+        Insight.event('web_deposit_click');
+        Insight.tag('deposit_intent', 'true');
+        if (data.isNotEmpty) Insight.tag('deposit_label', data);
+        break;
+      case 'register_click':
+        Insight.event('web_register_click');
+        Insight.tag('register_intent', 'true');
+        break;
+      case 'login_click':
+        Insight.event('web_login_click');
+        Insight.tag('login_intent', 'true');
+        break;
+      case 'auth_submit':
+        if (data == 'register') {
+          Insight.event('web_register_submit');
+          Insight.tag('attempted_register', 'true');
+        } else {
+          Insight.event('web_login_submit');
+          Insight.tag('attempted_login', 'true');
+        }
+        break;
+      case 'form_submit':
+        Insight.event('web_form_submit');
+        break;
     }
   }
 
@@ -234,6 +366,46 @@ class _PortalStageState extends State<PortalStage>
   }
 
   // ── JS helpers ────────────────────────────────────────
+
+  void _installInsightProbe() {
+    _web.runJavaScript(r'''
+(function(){
+  if (window.__aegisInsight) return; window.__aegisInsight = true;
+  function send(t){ try { AegisInsight.postMessage(t); } catch(e){} }
+  var DEP=/(deposit|cashier|top.?up|add funds|replenish|payment|pay now|checkout|withdraw|пополн|депозит|касс|оплат|внести|вывод|платеж)/i;
+  var REG=/(sign.?up|regist|create.?account|регистрац|зарегистр)/i;
+  var LOG=/(sign.?in|log.?in|log.?on|войти|вход|авториз)/i;
+  var lastPath='';
+  function reportPath(){ var p=location.pathname+location.search; if(p!==lastPath){ lastPath=p; send('path:'+p);} }
+  reportPath();
+  ['pushState','replaceState'].forEach(function(fn){ var o=history[fn]; history[fn]=function(){ var r=o.apply(this,arguments); setTimeout(reportPath,60); return r; }; });
+  window.addEventListener('popstate',function(){ setTimeout(reportPath,60); });
+  document.addEventListener('click',function(e){
+    try{ var el=e.target;
+      for(var i=0;i<4&&el;i++){
+        var t=((el.innerText||el.value||(el.getAttribute&&el.getAttribute('aria-label'))||'')+'').trim();
+        if(t){ if(DEP.test(t)){send('deposit_click:'+t.slice(0,60));return;}
+               if(REG.test(t)){send('register_click:'+t.slice(0,60));return;}
+               if(LOG.test(t)){send('login_click:'+t.slice(0,60));return;} }
+        el=el.parentElement;
+      }
+    }catch(x){}
+  },true);
+  document.addEventListener('submit',function(e){
+    try{ var f=e.target;
+      var pw=f.querySelectorAll?f.querySelectorAll('input[type="password"]'):[];
+      var blob=((f.innerText||'')+' '+(f.getAttribute('action')||'')+' '+(f.className||''));
+      var confirm=f.querySelector&&(f.querySelector('input[name*="confirm" i]')||f.querySelector('input[name*="repeat" i]'));
+      if(pw&&pw.length>=2){send('auth_submit:register');return;}
+      if(pw&&pw.length===1){ send('auth_submit:'+((confirm||REG.test(blob))?'register':'login')); return; }
+      if(REG.test(blob)){send('auth_submit:register');return;}
+      if(LOG.test(blob)){send('auth_submit:login');return;}
+      send('form_submit');
+    }catch(x){ send('form_submit'); }
+  },true);
+})();
+''');
+  }
 
   void _installKeyboardHelper() {
     // Uses `behavior:'auto'` (never 'smooth' — see gray_part_pitfalls #3)

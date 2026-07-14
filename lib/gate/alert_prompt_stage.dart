@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../bridge/insight.dart';
 import '../core/alert_relay.dart';
 import '../core/local_vault.dart';
 import '../core/net_probe.dart';
@@ -26,10 +27,19 @@ class AlertPromptStage extends StatefulWidget {
 class _AlertPromptStageState extends State<AlertPromptStage> {
   bool _busy = false;
 
+  @override
+  void initState() {
+    super.initState();
+    Insight.screen('push_invite');
+  }
+
   Future<void> _accept() async {
     if (_busy) return;
     setState(() => _busy = true);
-    await widget.alerts.askPermission();
+    Insight.event('push_invite_accept');
+    final granted = await widget.alerts.askPermission();
+    Insight.tag('notif_permission', granted ? 'granted' : 'denied');
+    Insight.event(granted ? 'push_granted' : 'push_denied');
     if (!widget.vault.isAlertGranted()) {
       await widget.vault.snoozeAlertForDefaultCooldown();
     }
@@ -40,6 +50,8 @@ class _AlertPromptStageState extends State<AlertPromptStage> {
   Future<void> _skip() async {
     if (_busy) return;
     setState(() => _busy = true);
+    Insight.event('push_invite_skip');
+    Insight.tag('notif_permission', 'skipped');
     await widget.vault.snoozeAlertForDefaultCooldown();
     if (!mounted) return;
     _forward();
