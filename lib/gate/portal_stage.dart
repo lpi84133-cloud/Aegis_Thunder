@@ -86,9 +86,20 @@ class _PortalStageState extends State<PortalStage>
   }
 
   void _applyImmersive() {
-    // Immersive-sticky hides both status bar and nav bar; auto-restores
-    // on gesture. Reapplied when the app comes back from background.
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    // Hide the status bar but keep navigation buttons always visible.
+    //
+    // immersiveSticky hides nav buttons and auto-restores them on touch.
+    // On button-navigation devices this causes a resize event every time
+    // the keyboard opens (nav bar pops in → window shrinks → WebView
+    // shifts → jitter). Keeping nav buttons always visible eliminates
+    // that extra resize cycle.
+    //
+    // We hide only the top overlay (status bar) so the battery/clock HUD
+    // stays hidden while the WebView is shown.
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: [SystemUiOverlay.bottom],
+    );
   }
 
   @override
@@ -580,13 +591,21 @@ class _PortalStageState extends State<PortalStage>
     final orient = MediaQuery.of(context).orientation;
     final vpad = MediaQuery.of(context).viewPadding;
 
-    // In portrait: leave a top gap = status-bar height so the notch
-    // never overlays the WebView content.
-    // In landscape: keep left/right insets so the WebView cannot
-    // creep under a side-mounted camera cutout.
+    // Status bar is hidden → vpad.top is 0, but we keep it for
+    // safety (e.g. notch / hole-punch camera still needs the gap).
+    // Nav buttons are always visible → add vpad.bottom so WebView
+    // content is never hidden behind the navigation bar.
+    // Landscape: also guard against side-mounted camera cutouts.
     final padding = orient == Orientation.landscape
-        ? EdgeInsets.only(left: vpad.left, right: vpad.right)
-        : EdgeInsets.only(top: vpad.top);
+        ? EdgeInsets.only(
+            left: vpad.left,
+            right: vpad.right,
+            bottom: vpad.bottom,
+          )
+        : EdgeInsets.only(
+            top: vpad.top,
+            bottom: vpad.bottom,
+          );
 
     return Padding(
       padding: padding,
