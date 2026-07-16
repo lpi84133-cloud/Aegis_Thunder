@@ -16,9 +16,9 @@ import '../vault/scrambler.dart';
 // This UA is also handed to WebViewController so both surfaces look
 // identical to the backend fingerprinting logic.
 
-// Scrambled Chrome version fragment  →  "132.0.6834.163"
+// Scrambled Chrome version fragment  →  "149.0.7827.163"
 const List<int> _chromeVersionBytes = <int>[
-  136, 41, 16, 78, 1, 254, 136, 219, 218, 29, 233, 36, 115, 176,
+  136, 46, 27, 78, 1, 254, 137, 219, 219, 30, 233, 36, 115, 176,
 ];
 
 // Scrambled WebKit version fragment  →  "605.1.15"
@@ -30,7 +30,7 @@ class UserAgentClient extends http.BaseClient {
   final http.Client _inner = http.Client();
   String _ua =
       'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 '
-      '(KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36';
+      '(KHTML, like Gecko) Chrome/149.0.7827.163 Mobile Safari/537.36';
 
   String get userAgent => _ua;
 
@@ -76,7 +76,7 @@ class UserAgentClient extends http.BaseClient {
 
   String _chromeVersion() {
     final v = unscramble(_chromeVersionBytes);
-    return v.isNotEmpty ? v : '132.0.6834.163';
+    return v.isNotEmpty ? v : '149.0.7827.163';
   }
 
   String _webkitVersion() {
