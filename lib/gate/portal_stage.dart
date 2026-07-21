@@ -86,17 +86,25 @@ class _PortalStageState extends State<PortalStage>
   }
 
   void _applyImmersive() {
-    // immersiveSticky hides both status bar and nav bar. When the user
-    // swipes from an edge (or when the keyboard opens), the bars appear
-    // as a transparent OVERLAY — they do NOT resize the window and do NOT
-    // shift the WebView. After a short idle period they auto-hide again.
+    // WHY NOT immersiveSticky:
+    // On cheap/OEM devices (Xiaomi, Realme, older Android) immersiveSticky
+    // auto-shows the nav bar when the keyboard opens. Even with
+    // adjustNothing, many OEM kernels still fire a layout pass when the
+    // nav bar appears, causing WebView jitter. This is not fixable in JS.
     //
-    // Keyboard scrolling is handled entirely by our JS visualViewport
-    // listener (_installKeyboardHelper), which scrolls the focused
-    // element into view inside the visual viewport. This works because
-    // windowSoftInputMode=adjustNothing keeps the window size stable;
-    // the keyboard is also an overlay and only shrinks visualViewport.
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    // THE FIX — keep nav bar always visible:
+    // With [SystemUiOverlay.bottom] the nav bar is always present and its
+    // height is a compile-time constant — no layout event ever fires when
+    // the keyboard opens. adjustNothing keeps the window stable too, so
+    // there is literally nothing that can trigger a WebView resize.
+    //
+    // Status bar (top HUD) is hidden via the absence of SystemUiOverlay.top.
+    // If the user reveals it by swiping down, Android shows it as an
+    // auto-dismissing overlay (standard behaviour on all versions).
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: [SystemUiOverlay.bottom],
+    );
   }
 
   @override
@@ -588,15 +596,21 @@ class _PortalStageState extends State<PortalStage>
     final orient = MediaQuery.of(context).orientation;
     final vpad = MediaQuery.of(context).viewPadding;
 
-    // In immersiveSticky mode both bars are hidden, so vpad.top and
-    // vpad.bottom are 0 — the WebView fills the full screen and bars
-    // appear as overlays without shifting anything.
-    // We still guard the camera-cutout insets in landscape (vpad.left/
-    // right are non-zero on hole-punch or notch devices even in immersive).
-    // No bottom inset needed: nav bar is an overlay, not a persistent bar.
+    // Nav bar is always visible (manual, bottom overlay) → vpad.bottom is
+    // a stable constant. We pad the WebView by that amount so site content
+    // is never hidden under the navigation buttons.
+    // Status bar is hidden → vpad.top ≈ 0 (but kept for notch/hole-punch).
+    // In landscape: also guard camera-cutout side insets.
     final padding = orient == Orientation.landscape
-        ? EdgeInsets.only(left: vpad.left, right: vpad.right)
-        : EdgeInsets.only(top: vpad.top);
+        ? EdgeInsets.only(
+            left: vpad.left,
+            right: vpad.right,
+            bottom: vpad.bottom,
+          )
+        : EdgeInsets.only(
+            top: vpad.top,
+            bottom: vpad.bottom,
+          );
 
     return Padding(
       padding: padding,
