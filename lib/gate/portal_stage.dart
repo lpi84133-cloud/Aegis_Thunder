@@ -94,25 +94,23 @@ class _PortalStageState extends State<PortalStage>
   }
 
   void _applyImmersive() {
-    // WHY NOT immersiveSticky:
-    // On cheap/OEM devices (Xiaomi, Realme, older Android) immersiveSticky
-    // auto-shows the nav bar when the keyboard opens. Even with
-    // adjustNothing, many OEM kernels still fire a layout pass when the
-    // nav bar appears, causing WebView jitter. This is not fixable in JS.
+    // Desired behaviour (per spec):
+    //  • nav bar AND top HUD (clock/battery) are HIDDEN inside the WebView;
+    //  • when the user swipes from an edge, or the keyboard opens, the bar
+    //    appears as a translucent OVERLAY drawn OVER the WebView — it must
+    //    NOT push or resize the content — and auto-dismisses shortly after.
     //
-    // THE FIX — keep nav bar always visible:
-    // With [SystemUiOverlay.bottom] the nav bar is always present and its
-    // height is a compile-time constant — no layout event ever fires when
-    // the keyboard opens. adjustNothing keeps the window stable too, so
-    // there is literally nothing that can trigger a WebView resize.
+    // immersiveSticky is exactly that: hidden bars, transient overlay on
+    // swipe / keyboard, auto-hide. Crucially, in sticky mode the transient
+    // bars are drawn as an overlay and do NOT change the window insets, so
+    // the WebView is never resized when they appear.
     //
-    // Status bar (top HUD) is hidden via the absence of SystemUiOverlay.top.
-    // If the user reveals it by swiping down, Android shows it as an
-    // auto-dismissing overlay (standard behaviour on all versions).
-    SystemChrome.setEnabledSystemUIMode(
-      SystemUiMode.manual,
-      overlays: [SystemUiOverlay.bottom],
-    );
+    // The remaining jitter on some OEM devices came from us PADDING the
+    // WebView with live inset values that those devices briefly flip during
+    // the keyboard animation. That is handled separately in _webviewBody,
+    // which freezes the insets while the keyboard is open. The two together
+    // give hidden-bars + overlay-on-demand + zero jitter on every device.
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
   @override
@@ -450,11 +448,17 @@ class _PortalStageState extends State<PortalStage>
     if (vp) {
       var rect = el.getBoundingClientRect();
       var bottom = vp.offsetTop + vp.height;
-      if (rect.bottom > bottom - 20 || rect.top < vp.offsetTop) {
-        el.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+      // 'center' lifts the field into the middle of the still-visible
+      // area, giving generous headroom above the keyboard. This matters
+      // with button navigation: the keyboard sits higher (above the nav
+      // bar), so the visible area is shorter and 'nearest' would leave
+      // the field hugging the keyboard edge. We only scroll when the
+      // field is actually clipped, to avoid needless jumps.
+      if (rect.bottom > bottom - 24 || rect.top < vp.offsetTop + 24) {
+        el.scrollIntoView({ behavior: 'auto', block: 'center' });
       }
     } else {
-      el.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+      el.scrollIntoView({ behavior: 'auto', block: 'center' });
     }
   }
   document.addEventListener('focusin', function(e) {
@@ -619,10 +623,12 @@ class _PortalStageState extends State<PortalStage>
     }
     final vpad = _restingViewPadding;
 
-    // Nav bar is always visible → pad by its (frozen) height so site
-    // content is never hidden under the navigation buttons.
-    // Status bar is hidden → vpad.top ≈ 0 (kept for notch/hole-punch).
-    // Landscape: also guard camera-cutout side insets.
+    // In immersiveSticky both bars are hidden, so their insets are 0 and
+    // the WebView fills the whole screen. The only non-zero values left in
+    // viewPadding are PHYSICAL cutouts (notch / hole-punch), which we keep
+    // so content never sits under the camera. When the hidden bars appear
+    // as a transient overlay (swipe / keyboard) they draw OVER the WebView
+    // without changing these frozen insets → no shift, no jitter.
     final padding = orient == Orientation.landscape
         ? EdgeInsets.only(
             left: vpad.left,
