@@ -52,6 +52,14 @@ class _PortalStageState extends State<PortalStage>
   StreamSubscription<List<ConnectivityResult>>? _connSub;
   Timer? _offlineDebounce;
 
+  // Last "resting" system-bar insets, captured only while the keyboard
+  // is CLOSED. The WebView is padded by these frozen values so that the
+  // transient nav-bar / status-bar inset flips that many OEM devices emit
+  // during the keyboard-open animation can never oscillate the WebView
+  // size (that oscillation is the jitter). Samsung keeps insets steady;
+  // budget devices do not — freezing makes every device behave like it.
+  EdgeInsets _restingViewPadding = EdgeInsets.zero;
+
   // URL matchers for funnel tracking.
   static final _depositRx = RegExp(
     r'(deposit|cashier|top.?up|add funds|replenish|payment|pay now|checkout|withdraw|'
@@ -572,9 +580,11 @@ class _PortalStageState extends State<PortalStage>
       },
       child: Scaffold(
         backgroundColor: Colors.black,
-        // CRITICAL: false so `windowSoftInputMode=adjustResize` in the
-        // manifest is the sole handler of keyboard resizing (avoids the
-        // dual-resize jitter — see gray_part_pitfalls).
+        // CRITICAL: false. With windowSoftInputMode=adjustNothing the
+        // window never resizes for the keyboard; the WebView keeps a
+        // constant size and the focused field is revealed via the JS
+        // visualViewport helper. Combined with the frozen system-bar
+        // insets in _webviewBody this removes all keyboard jitter.
         resizeToAvoidBottomInset: false,
         body: Stack(fit: StackFit.expand, children: [
           _webviewBody(context),
@@ -593,14 +603,26 @@ class _PortalStageState extends State<PortalStage>
   }
 
   Widget _webviewBody(BuildContext context) {
-    final orient = MediaQuery.of(context).orientation;
-    final vpad = MediaQuery.of(context).viewPadding;
+    // Aspect accessors: orientation/viewPadding rebuild this only when
+    // THEY change — not on every keyboard frame. viewInsets tells us
+    // whether the keyboard is currently open.
+    final orient = MediaQuery.orientationOf(context);
+    final liveViewPadding = MediaQuery.viewPaddingOf(context);
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
 
-    // Nav bar is always visible (manual, bottom overlay) → vpad.bottom is
-    // a stable constant. We pad the WebView by that amount so site content
-    // is never hidden under the navigation buttons.
-    // Status bar is hidden → vpad.top ≈ 0 (but kept for notch/hole-punch).
-    // In landscape: also guard camera-cutout side insets.
+    // Refresh the cached insets ONLY while the keyboard is closed. While
+    // it is open we keep the last resting values, so the padding fed to
+    // the WebView stays perfectly constant across the whole IME animation
+    // → the native surface never resizes → no jitter from the nav bar.
+    if (!keyboardOpen) {
+      _restingViewPadding = liveViewPadding;
+    }
+    final vpad = _restingViewPadding;
+
+    // Nav bar is always visible → pad by its (frozen) height so site
+    // content is never hidden under the navigation buttons.
+    // Status bar is hidden → vpad.top ≈ 0 (kept for notch/hole-punch).
+    // Landscape: also guard camera-cutout side insets.
     final padding = orient == Orientation.landscape
         ? EdgeInsets.only(
             left: vpad.left,
