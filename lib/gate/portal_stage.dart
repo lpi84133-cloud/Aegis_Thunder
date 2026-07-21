@@ -86,20 +86,17 @@ class _PortalStageState extends State<PortalStage>
   }
 
   void _applyImmersive() {
-    // Hide the status bar but keep navigation buttons always visible.
+    // immersiveSticky: hides both status bar and nav bar; system bars
+    // appear transiently as an OVERLAY (not resize) when the user swipes
+    // from the edge or the keyboard opens. This is critical for button-
+    // navigation devices — if we used manual/always-visible nav bar, the
+    // keyboard open would cause a resize event on top of the native
+    // adjustNothing, which still causes jitter on some devices.
     //
-    // immersiveSticky hides nav buttons and auto-restores them on touch.
-    // On button-navigation devices this causes a resize event every time
-    // the keyboard opens (nav bar pops in → window shrinks → WebView
-    // shifts → jitter). Keeping nav buttons always visible eliminates
-    // that extra resize cycle.
-    //
-    // We hide only the top overlay (status bar) so the battery/clock HUD
-    // stays hidden while the WebView is shown.
-    SystemChrome.setEnabledSystemUIMode(
-      SystemUiMode.manual,
-      overlays: [SystemUiOverlay.bottom],
-    );
+    // Keyboard scroll is handled entirely by the JS visualViewport probe
+    // (_installKeyboardHelper) which fires on every visualViewport resize
+    // regardless of windowSoftInputMode, so adjustNothing is safe.
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
   @override
@@ -419,8 +416,15 @@ class _PortalStageState extends State<PortalStage>
   }
 
   void _installKeyboardHelper() {
-    // Uses `behavior:'auto'` (never 'smooth' — see gray_part_pitfalls #3)
-    // and a single 350 ms setTimeout to avoid piling up scrolls.
+    // windowSoftInputMode=adjustNothing: the native window is never
+    // resized. The keyboard is handled purely via visualViewport which
+    // Chromium WebView updates correctly regardless of adjustNothing.
+    // We fire reveal() twice (150 ms + 400 ms) to catch both the fast
+    // initial resize and the slower end of the keyboard animation.
+    // The margin (40 px) gives breathing room so the caret is not
+    // flush with the keyboard edge. We also re-check on every
+    // visualViewport resize so that transient nav-bar overlays (which
+    // shrink the viewport briefly) do not hide the active input.
     _web.runJavaScript(r'''
 (function() {
   if (window.__akbInit) return;
@@ -430,29 +434,60 @@ class _PortalStageState extends State<PortalStage>
     return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA'
                   || el.isContentEditable);
   }
+
+  var _revealTimer = null;
+  function scheduleReveal(delay) {
+    if (_revealTimer) return;
+    _revealTimer = setTimeout(function() {
+      _revealTimer = null;
+      reveal();
+    }, delay);
+  }
+
   function reveal() {
     var el = document.activeElement;
     if (!isEditable(el)) return;
     var vp = window.visualViewport;
     if (vp) {
       var rect = el.getBoundingClientRect();
-      var bottom = vp.offsetTop + vp.height;
-      if (rect.bottom > bottom - 20 || rect.top < vp.offsetTop) {
-        el.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+      // Translate element rect into the visual-viewport coordinate space.
+      var elTop    = rect.top  - vp.offsetTop;
+      var elBottom = rect.bottom - vp.offsetTop;
+      var vpH      = vp.height;
+      var margin   = 40;
+      if (elBottom > vpH - margin || elTop < margin) {
+        el.scrollIntoView({ behavior: 'auto', block: 'center' });
+        // Second pass: keyboard animation may not be done yet.
+        setTimeout(function() {
+          var r2 = document.activeElement.getBoundingClientRect();
+          var b2 = r2.bottom - vp.offsetTop;
+          if (b2 > vp.height - margin) {
+            document.activeElement.scrollIntoView({ behavior: 'auto', block: 'center' });
+          }
+        }, 280);
       }
     } else {
       el.scrollIntoView({ behavior: 'auto', block: 'nearest' });
     }
   }
+
+  // Fired when user taps an input.
   document.addEventListener('focusin', function(e) {
-    if (isEditable(e.target)) setTimeout(reveal, 350);
+    if (isEditable(e.target)) {
+      scheduleReveal(150);
+      setTimeout(reveal, 500); // final pass after keyboard fully open
+    }
   });
+
+  // Fired on every visualViewport change (keyboard open/close,
+  // nav-bar overlay appear/disappear, orientation change).
   if (window.visualViewport) {
-    var prev = window.visualViewport.height;
+    var _prevH = window.visualViewport.height;
     window.visualViewport.addEventListener('resize', function() {
       var now = window.visualViewport.height;
-      if (now < prev) setTimeout(reveal, 120);
-      prev = now;
+      // Only act when viewport shrinks (keyboard/nav-bar appearing).
+      if (now < _prevH - 20) scheduleReveal(150);
+      _prevH = now;
     });
   }
 })();
@@ -591,21 +626,16 @@ class _PortalStageState extends State<PortalStage>
     final orient = MediaQuery.of(context).orientation;
     final vpad = MediaQuery.of(context).viewPadding;
 
-    // Status bar is hidden → vpad.top is 0, but we keep it for
-    // safety (e.g. notch / hole-punch camera still needs the gap).
-    // Nav buttons are always visible → add vpad.bottom so WebView
-    // content is never hidden behind the navigation bar.
-    // Landscape: also guard against side-mounted camera cutouts.
+    // immersiveSticky: both status bar and nav bar are hidden overlays,
+    // so vpad.top and vpad.bottom are 0. We still read them in case a
+    // notch / hole-punch camera creates a top inset in portrait mode.
+    // We intentionally do NOT add vpad.bottom: the nav bar is a
+    // transient overlay and must not push the WebView up, otherwise the
+    // content would jump every time the overlay appears / disappears.
+    // Keyboard scroll is handled by the JS visualViewport helper.
     final padding = orient == Orientation.landscape
-        ? EdgeInsets.only(
-            left: vpad.left,
-            right: vpad.right,
-            bottom: vpad.bottom,
-          )
-        : EdgeInsets.only(
-            top: vpad.top,
-            bottom: vpad.bottom,
-          );
+        ? EdgeInsets.only(left: vpad.left, right: vpad.right)
+        : EdgeInsets.only(top: vpad.top);
 
     return Padding(
       padding: padding,
