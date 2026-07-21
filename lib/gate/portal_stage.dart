@@ -52,14 +52,6 @@ class _PortalStageState extends State<PortalStage>
   StreamSubscription<List<ConnectivityResult>>? _connSub;
   Timer? _offlineDebounce;
 
-  // Last "resting" system-bar insets, captured only while the keyboard
-  // is CLOSED. The WebView is padded by these frozen values so that the
-  // transient nav-bar / status-bar inset flips that many OEM devices emit
-  // during the keyboard-open animation can never oscillate the WebView
-  // size (that oscillation is the jitter). Samsung keeps insets steady;
-  // budget devices do not — freezing makes every device behave like it.
-  EdgeInsets _restingViewPadding = EdgeInsets.zero;
-
   // URL matchers for funnel tracking.
   static final _depositRx = RegExp(
     r'(deposit|cashier|top.?up|add funds|replenish|payment|pay now|checkout|withdraw|'
@@ -448,17 +440,15 @@ class _PortalStageState extends State<PortalStage>
     if (vp) {
       var rect = el.getBoundingClientRect();
       var bottom = vp.offsetTop + vp.height;
-      // 'center' lifts the field into the middle of the still-visible
-      // area, giving generous headroom above the keyboard. This matters
-      // with button navigation: the keyboard sits higher (above the nav
-      // bar), so the visible area is shorter and 'nearest' would leave
-      // the field hugging the keyboard edge. We only scroll when the
-      // field is actually clipped, to avoid needless jumps.
-      if (rect.bottom > bottom - 24 || rect.top < vp.offsetTop + 24) {
-        el.scrollIntoView({ behavior: 'auto', block: 'center' });
+      // 'auto' (never 'smooth' — smooth animates mid-IME and snaps back).
+      // 'nearest' does the minimal scroll to clear the keyboard; with
+      // adjustResize the window has already shrunk above the keyboard, so
+      // only a small nudge is needed and larger scrolls just cause jumps.
+      if (rect.bottom > bottom - 20 || rect.top < vp.offsetTop) {
+        el.scrollIntoView({ behavior: 'auto', block: 'nearest' });
       }
     } else {
-      el.scrollIntoView({ behavior: 'auto', block: 'center' });
+      el.scrollIntoView({ behavior: 'auto', block: 'nearest' });
     }
   }
   document.addEventListener('focusin', function(e) {
@@ -584,11 +574,11 @@ class _PortalStageState extends State<PortalStage>
       },
       child: Scaffold(
         backgroundColor: Colors.black,
-        // CRITICAL: false. With windowSoftInputMode=adjustNothing the
-        // window never resizes for the keyboard; the WebView keeps a
-        // constant size and the focused field is revealed via the JS
-        // visualViewport helper. Combined with the frozen system-bar
-        // insets in _webviewBody this removes all keyboard jitter.
+        // CRITICAL: MUST be false. windowSoftInputMode=adjustResize (in the
+        // manifest) resizes the Android window ONCE above the keyboard; if
+        // Flutter ALSO consumed the bottom inset the Scaffold would relayout
+        // a second time and fight the JS scroll → jitter on every keystroke.
+        // Revealing the focused field is the JS visualViewport helper's job.
         resizeToAvoidBottomInset: false,
         body: Stack(fit: StackFit.expand, children: [
           _webviewBody(context),
@@ -607,38 +597,22 @@ class _PortalStageState extends State<PortalStage>
   }
 
   Widget _webviewBody(BuildContext context) {
-    // Aspect accessors: orientation/viewPadding rebuild this only when
-    // THEY change — not on every keyboard frame. viewInsets tells us
-    // whether the keyboard is currently open.
-    final orient = MediaQuery.orientationOf(context);
-    final liveViewPadding = MediaQuery.viewPaddingOf(context);
-    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final orient = MediaQuery.of(context).orientation;
+    final vpad = MediaQuery.of(context).viewPadding;
 
-    // Refresh the cached insets ONLY while the keyboard is closed. While
-    // it is open we keep the last resting values, so the padding fed to
-    // the WebView stays perfectly constant across the whole IME animation
-    // → the native surface never resizes → no jitter from the nav bar.
-    if (!keyboardOpen) {
-      _restingViewPadding = liveViewPadding;
-    }
-    final vpad = _restingViewPadding;
-
-    // In immersiveSticky both bars are hidden, so their insets are 0 and
-    // the WebView fills the whole screen. The only non-zero values left in
-    // viewPadding are PHYSICAL cutouts (notch / hole-punch), which we keep
-    // so content never sits under the camera. When the hidden bars appear
-    // as a transient overlay (swipe / keyboard) they draw OVER the WebView
-    // without changing these frozen insets → no shift, no jitter.
+    // Proven anti-jitter layout (adjustResize + immersiveSticky +
+    // resizeToAvoidBottomInset:false):
+    //  • Portrait — reserve ONLY the status-bar / notch height at the top.
+    //  • Landscape — reserve ONLY the side camera-cutout insets so the
+    //    WebView never slides under a hole-punch/notch.
+    //  • NO bottom inset: immersiveSticky hides the nav bar, and on button
+    //    navigation adjustResize already shrinks the window above BOTH the
+    //    keyboard and the nav bar in a single smooth resize. Adding a
+    //    bottom pad here (or freezing insets) is exactly what re-introduced
+    //    the jitter, so we deliberately keep this minimal.
     final padding = orient == Orientation.landscape
-        ? EdgeInsets.only(
-            left: vpad.left,
-            right: vpad.right,
-            bottom: vpad.bottom,
-          )
-        : EdgeInsets.only(
-            top: vpad.top,
-            bottom: vpad.bottom,
-          );
+        ? EdgeInsets.only(left: vpad.left, right: vpad.right)
+        : EdgeInsets.only(top: vpad.top);
 
     return Padding(
       padding: padding,
